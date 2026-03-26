@@ -257,7 +257,7 @@ function renderPRs() {
     list.innerHTML = prs.map((pr, i) => {
         const newComments = newCommentCount(pr.number, pr.commentCount);
         const humanChip = pr.commentCount > 0
-            ? `<span class="meta-chip">◎ ${pr.commentCount}${newComments > 0 ? ` <span class="new-comments">+${newComments} new</span>` : ''}</span>`
+            ? `<span class="meta-chip">◎ ${pr.commentCount} comments${newComments > 0 ? ` <span class="new-comments">(+${newComments} new)</span>` : ''}</span>`
             : '';
         const copilotChip = pr.copilotUnresolved > 0
             ? `<span class="meta-chip copilot-chip">⬡ ${pr.copilotUnresolved} copilot</span>`
@@ -501,9 +501,13 @@ async function loadPRs() {
             const repo     = node.repository.name;
             const ci       = await getCIStatus(owner, repo, node.headRefOid, token);
             const threads = node.reviewThreads?.nodes ?? [];
-            const COPILOT = 'copilot-pull-request-reviewer[bot]';
-            const humanCommentCount   = threads.filter(t => t.comments.nodes[0]?.author?.login !== COPILOT).length;
-            const copilotUnresolved   = threads.filter(t => !t.isResolved && t.comments.nodes[0]?.author?.login === COPILOT).length;
+            const isCopilot = login => login && (
+                login === 'copilot-pull-request-reviewer' ||
+                login === 'copilot-pull-request-reviewer[bot]' ||
+                login.startsWith('copilot')
+            );
+            const humanCommentCount = threads.filter(t => !isCopilot(t.comments.nodes[0]?.author?.login)).length;
+            const copilotUnresolved = threads.filter(t => !t.isResolved && isCopilot(t.comments.nodes[0]?.author?.login)).length;
             const reviews  = node.reviews?.nodes ?? [];
             // latest review state per author (last review wins)
             const latestByAuthor = {};
