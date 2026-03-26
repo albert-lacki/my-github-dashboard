@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#13161b"/>
+  <rect x="1" y="1" width="30" height="30" rx="5.5" fill="none" stroke="#232830" stroke-width="1"/>
+  <!-- PR arrow up -->
+  <line x1="10" y1="22" x2="10" y2="10" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round"/>
+  <polyline points="6,14 10,10 14,14" fill="none" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- dot bottom right -->
+  <circle cx="22" cy="22" r="3.5" fill="#4ade80"/>
+  <!-- dot top right -->
+  <circle cx="22" cy="10" r="3.5" fill="#4ade80"/>
+  <!-- connecting curve -->
+  <path d="M22 13.5 Q22 17 18 17 Q14.5 17 14.5 17" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round"/>
+</svg>
+

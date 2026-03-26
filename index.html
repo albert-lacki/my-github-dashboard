@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PR Inbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+
+<!-- Drawer -->
+<div class="drawer" id="drawer">
+    <div class="drawer-header">
+        <span class="drawer-title">Settings</span>
+        <button class="btn-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-body">
+        <div class="sidebar-section">
+            <div class="sidebar-label">GitHub Token</div>
+            <div class="token-wrap">
+                <input class="token-input" id="tokenInput" type="password"
+                       placeholder="ghp_xxxxxxxxxxxx"
+                       oninput="saveToken(this.value)"
+                       autocomplete="off">
+                <span class="token-eye" onclick="toggleToken()">👁</span>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-label">Repo Prefixes</div>
+            <div class="prefix-tags" id="prefixTags"></div>
+            <div class="prefix-input-row">
+                <input class="prefix-input" id="prefixInput" placeholder="e.g. ring-"
+                       onkeydown="if(event.key==='Enter') addPrefix()">
+                <button class="btn-add" onclick="addPrefix()">+</button>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-label">Auto-refresh</div>
+            <div class="auto-refresh-row">
+                <label class="toggle-label">
+                    <input type="checkbox" id="autoRefreshToggle" onchange="setAutoRefresh(this.checked)">
+                    enabled
+                </label>
+                <select id="autoRefreshFreq" class="freq-select" onchange="setAutoRefreshFreq(parseInt(this.value))">
+                    <option value="5">every 5 min</option>
+                    <option value="15" selected>every 15 min</option>
+                    <option value="30">every 30 min</option>
+                    <option value="60">every 60 min</option>
+                </select>
+            </div>
+        </div>
+        <div class="sidebar-section">
+            <div class="sidebar-label">Config</div>
+            <button class="btn-config" onclick="exportConfig()">⎘ copy as JSON</button>
+            <textarea class="config-import" id="configImport"
+                      placeholder="Paste JSON config here…"
+                      onpaste="scheduleImport()"></textarea>
+            <button class="btn-config" onclick="importConfig()">⬇ import JSON</button>
+        </div>
+    </div>
+</div>
+
+<!-- Topbar -->
+<header class="topbar">
+    <button class="btn-menu" onclick="openDrawer()" title="Settings">☰</button>
+    <div class="logo">pr-inbox</div>
+
+    <div class="topbar-stats">
+        <div class="tstat">total <span class="tstat-num" id="statTotal">—</span></div>
+        <div class="tstat">stale &gt;2d <span class="tstat-num urgent" id="statStale">—</span></div>
+        <div class="tstat">new &lt;24h <span class="tstat-num fresh" id="statNew">—</span></div>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-status">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">not connected</span>
+    </div>
+    <button class="btn-refresh" id="btnRefresh" onclick="loadPRs()">↻ refresh</button>
+</header>
+
+<!-- Main -->
+<main class="main">
+    <div class="main-header-wrap">
+        <div class="main-title" onclick="toggleModeMenu()" id="modeTitle">
+            review_requested
+            <span class="mode-arrow">▾</span>
+        </div>
+        <div class="count-badge" id="countBadge">0</div>
+        <div class="mode-menu" id="modeMenu">
+            <div class="mode-item active" onclick="setMode('review_requested', this)">
+                <span class="mode-icon">👁</span>review_requested
+            </div>
+            <div class="mode-item" onclick="setMode('approved', this)">
+                <span class="mode-icon">✓</span>approved
+            </div>
+            <div class="mode-item" onclick="setMode('my_prs', this)">
+                <span class="mode-icon">✎</span>my_prs
+            </div>
+            <div class="mode-item" onclick="setMode('other', this)">
+                <span class="mode-icon">◈</span>other
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('all', this)">all</button>
+        <button class="filter-btn" onclick="setFilter('ci_pass', this)">CI pass</button>
+        <button class="filter-btn" onclick="setFilter('stale', this)">stale &gt;2d</button>
+        <button class="filter-btn" onclick="setFilter('new', this)">new &lt;24h</button>
+        <button class="filter-btn" onclick="setFilter('new_comments', this)">new comments</button>
+        <button class="filter-btn" onclick="setFilter('changes_requested', this)">changes requested</button>
+        <button class="filter-btn filter-btn-right" id="btnDraftToggle"
+                onclick="setShowDrafts(currentMode, !showDrafts(currentMode))">drafts: off</button>
+    </div>
+
+    <div class="pr-list" id="prList">
+        <div class="state-box">
+            <div class="big">◎</div>
+            Enter your GitHub token and repo prefixes,<br>then hit refresh.
+        </div>
+    </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
+
