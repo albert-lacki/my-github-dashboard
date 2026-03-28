@@ -116,7 +116,7 @@ All settings are stored in `localStorage` and survive page reload.
 ```json
 {
   "token": "ghp_xxxxxxxxxxxx",
-  "prefixes": ["ring-", "sdk-", "orange-"]
+  "prefixes": ["ring-", "sdk-"]
 }
 ```
 
