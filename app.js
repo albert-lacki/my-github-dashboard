@@ -29,76 +29,19 @@ function updateDraftToggle() {
 let lastSeenCount = null; // PR count when tab was last active
 let hasUnread = false;
 
-function buildFaviconUrl(color) {
-    const c = document.createElement('canvas');
-    c.width = 32; c.height = 32;
-    const ctx = c.getContext('2d');
-
-    // background rounded rect
-    ctx.fillStyle = '#13161b';
-    ctx.beginPath();
-    ctx.roundRect(0, 0, 32, 32, 6);
-    ctx.fill();
-
-    // border
-    ctx.strokeStyle = '#232830';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(0.5, 0.5, 31, 31, 5.5);
-    ctx.stroke();
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // arrow up (branch line)
-    ctx.beginPath();
-    ctx.moveTo(10, 22); ctx.lineTo(10, 10);
-    ctx.stroke();
-    // arrowhead
-    ctx.beginPath();
-    ctx.moveTo(6, 14); ctx.lineTo(10, 10); ctx.lineTo(14, 14);
-    ctx.stroke();
-
-    // top dot
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(22, 10, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // bottom dot
-    ctx.beginPath();
-    ctx.arc(22, 22, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // connecting curve
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(22, 13.5);
-    ctx.quadraticCurveTo(22, 17, 18, 17);
-    ctx.lineTo(14.5, 17);
-    ctx.stroke();
-
-    return c.toDataURL('image/png');
-}
-
-function setFavicon(color) {
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-    link.type = 'image/png';
-    link.href = buildFaviconUrl(color);
+function setFavicon(alert) {
+    const link = document.querySelector("link[rel='icon']");
+    if (link) link.href = alert ? 'favicon-alert.svg' : 'favicon.svg';
 }
 
 function setUnread(count) {
     hasUnread = count > 0;
     if (hasUnread) {
         document.title = `(${count} new) PR Inbox`;
-        setFavicon('#fbbf24'); // yellow
+        setFavicon(true);
     } else {
         document.title = 'PR Inbox';
-        setFavicon('#4ade80'); // green
+        setFavicon(false);
     }
 }
 
@@ -695,7 +638,7 @@ function showToast(msg) {
     restoreModeFromHash();
     updateDraftToggle();
     scheduleAutoRefresh();
-    setFavicon('#4ade80'); // init with green
+    setFavicon(false); // init with green
     if (loadToken()) loadPRs();
 })();
 
