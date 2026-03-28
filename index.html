@@ -79,7 +79,7 @@
 
     <div class="topbar-stats">
         <div class="tstat">total <span class="tstat-num" id="statTotal">—</span></div>
-        <div class="tstat">stale &gt;2d <span class="tstat-num urgent" id="statStale">—</span></div>
+        <div class="tstat">stale &gt;5d <span class="tstat-num urgent" id="statStale">—</span></div>
         <div class="tstat">new &lt;24h <span class="tstat-num fresh" id="statNew">—</span></div>
     </div>
 
@@ -104,8 +104,8 @@
             <div class="mode-item active" onclick="setMode('review_requested', this)">
                 <span class="mode-icon">👁</span>review_requested
             </div>
-            <div class="mode-item" onclick="setMode('approved', this)">
-                <span class="mode-icon">✓</span>approved
+            <div class="mode-item" onclick="setMode('reviewed', this)">
+                <span class="mode-icon">✓</span>reviewed
             </div>
             <div class="mode-item" onclick="setMode('my_prs', this)">
                 <span class="mode-icon">✎</span>my_prs
@@ -118,11 +118,9 @@
 
     <div class="filter-bar">
         <button class="filter-btn active" onclick="setFilter('all', this)">all</button>
-        <button class="filter-btn" onclick="setFilter('ci_pass', this)">CI pass</button>
-        <button class="filter-btn" onclick="setFilter('stale', this)">stale &gt;2d</button>
         <button class="filter-btn" onclick="setFilter('new', this)">new &lt;24h</button>
         <button class="filter-btn" onclick="setFilter('new_comments', this)">new comments</button>
-        <button class="filter-btn" onclick="setFilter('changes_requested', this)">changes requested</button>
+        <button class="filter-btn" onclick="setFilter('stale', this)">stale &gt;5d</button>
         <button class="filter-btn filter-btn-right" id="btnDraftToggle"
                 onclick="setShowDrafts(currentMode, !showDrafts(currentMode))">drafts: off</button>
     </div>

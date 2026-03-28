@@ -1,7 +1,7 @@
 # PR Inbox — Product Spec
 
 **Status:** implemented  
-**Last updated:** 2026-03-28  
+**Last updated:** 2026-03-28
 **Owner:** Albert
 
 ---
@@ -45,12 +45,12 @@ favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
 ### Implemented
 
 - Fetch open PRs via **GitHub GraphQL API** (search query, cursor-based pagination, up to 200 results)
-- Four view **modes**: `review_requested` / `approved` / `my_prs` / `other`
+- Four view **modes**: `review_requested` / `reviewed` / `my_prs` / `other`
 - Filter PRs client-side by configurable **repository name prefixes**
 - Display per PR card: repo name, title, PR number, author (login + avatar), age, CI status, review thread count, Copilot unresolved count, labels, draft indicator
 - **Left border colour** per mode indicating PR state (see FR-08)
-- Filter bar: All / CI pass / Stale >2d / New <24h / New comments / Changes requested / Drafts toggle
-- Summary stats in topbar: total, stale >2d, new <24h
+- Filter bar: All / New <24h / New comments / Stale >5d / Drafts toggle
+- Summary stats in topbar: total, stale >5d, new <24h
 - Prefix configuration UI: add/remove tags, persisted in `localStorage`
 - GitHub PAT stored in `localStorage`, masked by default with toggle
 - Status indicator: connected / fetching / error
@@ -60,10 +60,14 @@ favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
 - **New comment tracking**: records comment count + timestamp on PR click; shows `N comments (+X new)` if count increased since last visit; human threads and Copilot unresolved shown separately
 - **Config export/import**: copy/paste JSON `{ token, prefixes, includeAssigned }` in Settings drawer
 - **Hash router**: `location.hash` reflects current mode; survives page refresh
-- **Sort**: always newest first (by `createdAt`)
+- **Sort**: always by last activity (`updatedAt`) DESC — most recently active first
 - **Draft visibility toggle**: per-mode, persisted; default OFF except `my_prs`
 - **Include assigned PRs toggle**: when ON, PRs where viewer is assignee are shown regardless of prefix filter; persisted in localStorage; default ON
-- **Background refresh notifications**: yellow favicon (`favicon-alert.svg`) + `(N new) PR Inbox` tab title when new PRs appear during auto-refresh while tab is inactive; resets on tab focus
+- **Background refresh notifications**: yellow favicon (`favicon-alert.svg`) + tab title update when:
+  1. new PRs appear in the current view during auto-refresh while tab is inactive
+  2. new activity appears on `my_prs` (new comment, new APPROVED, new CHANGES_REQUESTED)
+  - Title format: `(3 new) PR Inbox`, `(activity) PR Inbox`, or `(3 new, activity) PR Inbox`
+  - Resets on tab focus
 - **`CHANGES_REQUESTED` visibility**: second GraphQL query (`reviewed-by:@me`) ensures PRs where viewer gave changes requested still appear even after GitHub removes them from `review-requested`
 
 ### Out of scope
@@ -104,9 +108,9 @@ favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
 | Mode | GraphQL search query |
 |---|---|
 | `review_requested` | `is:pr is:open review-requested:@me` |
-| `approved` | `is:pr is:open reviewed-by:@me` |
-| `my_prs` | `is:pr is:open author:@me` |
-| `other` | `is:pr is:open review-requested:@me` (prefix filter inverted) |
+| `reviewed`         | `is:pr is:open reviewed-by:@me` |
+| `my_prs`           | `is:pr is:open author:@me` |
+| `other`            | `is:pr is:open review-requested:@me` (prefix filter inverted) |
 
 ### FR-03 — CI Status
 
@@ -145,7 +149,7 @@ Each PR card shows:
 | PR title | `title` | Second row, truncated with ellipsis |
 | Labels + draft | `labels.nodes`, `isDraft` | Inline after title, colour-coded chips |
 | Author | `author.login` + `avatarUrl` | Meta row, avatar 20×20 |
-| Age | `createdAt` → now delta | Meta row, format `<1h / Xh / Xd` |
+| Age (last activity) | `updatedAt` → now delta | Meta row, format `<1h / Xh / Xd`; yellow ≥2d, red ≥5d |
 | Human review threads | `reviewThreads` (non-Copilot) | Meta row, `◎ N comments (+X new)` |
 | Copilot unresolved | `reviewThreads` (Copilot bot, unresolved) | Meta row, `⬡ N copilot` (blue) |
 | PR number | `number` | Top-right column |
@@ -155,14 +159,14 @@ Clicking a card opens the PR in a new tab and records current comment count + ti
 
 ### FR-06 — Left Border Colour (per mode)
 
-| Mode | 🟢 Green | 🟡 Yellow | 🔴 Red | None |
-|---|---|---|---|---|
-| `review_requested` | age < 24h | age ≥ 48h | I gave `REQUEST_CHANGES` | 24h–48h |
-| `other` | age < 24h | age ≥ 48h | I gave `REQUEST_CHANGES` | 24h–48h |
-| `my_prs` | ≥ 2 `APPROVED` | — | anyone gave `REQUEST_CHANGES` | otherwise |
-| `approved` | — | age ≥ 48h | — | otherwise |
+| Mode | 🟢 Green | 🔴 Red | None |
+|---|---|---|---|
+| `review_requested` | ≥ 2 `APPROVED` | anyone gave `CHANGES_REQUESTED` | otherwise |
+| `other` | ≥ 2 `APPROVED` | anyone gave `CHANGES_REQUESTED` | otherwise |
+| `my_prs` | ≥ 2 `APPROVED` | anyone gave `CHANGES_REQUESTED` | otherwise |
+| `reviewed` | I gave `APPROVED` | I gave `CHANGES_REQUESTED` | otherwise |
 
-Review states derived from `reviews(last: 50)` GraphQL field; latest review per author wins.
+No yellow border — age is communicated via the age badge colour only.
 
 ### FR-07 — Filter Bar
 
@@ -171,11 +175,9 @@ Filters above the PR list (single-select, default `all`):
 | Filter | Condition |
 |---|---|
 | all | no additional filter |
-| CI pass | `ci === 'pass'` |
-| stale >2d | `ageHours >= 48` |
-| new <24h | `ageHours < 24` |
+| new <24h | `ageHours < 24` (by `createdAt`) |
 | new comments | `newCommentCount > 0` (since last click) |
-| changes requested | `iChangesRequested \|\| anyChangesRequested` |
+| stale >5d | `updatedAgo >= 120h` |
 
 **Draft toggle** (right-aligned in filter bar): per-mode on/off, persisted in `localStorage`. Default: OFF for all modes except `my_prs`.
 
@@ -186,8 +188,8 @@ Prefix filter (FR-04) is always applied on top of the tab filter.
 Three stat pills in topbar, updated after each fetch and after prefix/filter changes:
 
 - **total** — count of filtered PRs
-- **stale >2d** — PRs with `ageHours >= 48` (red number)
-- **new <24h** — PRs with `ageHours < 24` (green number)
+- **stale >5d** — PRs with `updatedAgo >= 120h` (red number)
+- **new <24h** — PRs with `ageHours < 24` (by `createdAt`) (green number)
 
 ### FR-09 — Status Indicator
 
@@ -207,7 +209,7 @@ All user config survives page reload:
 | `pr_token` | string, raw PAT |
 | `pr_prefixes` | JSON array of strings |
 | `pr_ci_cache` | JSON object, SHA → `{ status, expiresAt, accessedAt }` |
-| `pr_seen` | JSON object, PR number → `{ commentCount, seenAt }` |
+| `pr_seen` | JSON object, PR number → `{ commentCount, approvedCount, anyChangesRequested, seenAt }` |
 | `pr_auto_refresh` | `"true"` / `"false"` |
 | `pr_auto_refresh_freq` | number (minutes) |
 | `pr_show_drafts_{mode}` | `"true"` / `"false"` per mode |
@@ -224,10 +226,22 @@ Slide-in drawer (left side), opened via `☰` button in topbar:
 
 ### FR-13 — Background Notifications
 
-When auto-refresh fires while the tab is inactive and the filtered PR count has increased:
-- Tab title changes to `(N new) PR Inbox`
-- Favicon switches from `favicon.svg` (green) to `favicon-alert.svg` (yellow)
-- Both reset to default when the user returns to the tab (`visibilitychange` event)
+When auto-refresh fires while the tab is inactive:
+
+**New PRs** — filtered PR count increased since last tab visit:
+- Tab title: `(N new) PR Inbox`
+
+**My PR activity** — any PR where `author === viewerLogin` has:
+- more comments than last snapshot, or
+- more APPROVEDs than last snapshot, or
+- new CHANGES_REQUESTED that wasn't there before
+- Tab title: `(activity) PR Inbox`
+
+Both can combine: `(3 new, activity) PR Inbox`
+
+Favicon switches to `favicon-alert.svg` (yellow) in either case.
+
+State is snapshotted on every load while tab is visible, and on `visibilitychange` when returning to the tab. Both favicon and title reset to default on tab focus.
 
 ### FR-12 — Hash Router
 
@@ -258,7 +272,7 @@ Headers:
   Content-Type: application/json
 
 Query fields used per PR node:
-  number, title, url, createdAt, headRefOid, state, isDraft
+  number, title, url, createdAt, updatedAt, headRefOid, state, isDraft
   labels(first: 10) { nodes { name color } }
   assignees(first: 10) { nodes { login } }
   reviewThreads(first: 100) {

@@ -34,10 +34,13 @@ function setFavicon(alert) {
     if (link) link.href = alert ? 'favicon-alert.svg' : 'favicon.svg';
 }
 
-function setUnread(count) {
-    hasUnread = count > 0;
+function setUnread(count, myPRActivity) {
+    hasUnread = count > 0 || myPRActivity;
     if (hasUnread) {
-        document.title = `(${count} new) PR Inbox`;
+        const parts = [];
+        if (count > 0)     parts.push(`${count} new`);
+        if (myPRActivity)  parts.push('activity');
+        document.title = `(${parts.join(', ')}) PR Inbox`;
         setFavicon(true);
     } else {
         document.title = 'PR Inbox';
@@ -49,7 +52,8 @@ function setUnread(count) {
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         lastSeenCount = filteredPRs().length;
-        setUnread(0);
+        allPRs.filter(pr => pr.author === viewerLogin).forEach(markSeenFull);
+        setUnread(0, false);
     }
 });
 
@@ -90,13 +94,13 @@ document.addEventListener('click', e => {
 
 const MODE_LABELS = {
     review_requested: 'review_requested',
-    approved:         'approved',
+    reviewed:         'reviewed',
     my_prs:           'my_prs',
     other:            'other',
 };
 const MODE_QUERIES = {
     review_requested: 'is:pr is:open review-requested:@me',
-    approved:         'is:pr is:open reviewed-by:@me',
+    reviewed:         'is:pr is:open reviewed-by:@me',
     my_prs:           'is:pr is:open author:@me',
     other:            'is:pr is:open review-requested:@me',
 };
@@ -236,11 +240,9 @@ function filteredPRs() {
         }
     }
     if (!showDrafts(currentMode)) prs = prs.filter(pr => !pr.isDraft);
-    if (currentFilter === 'ci_pass')          prs = prs.filter(pr => pr.ci === 'pass');
-    if (currentFilter === 'stale')             prs = prs.filter(pr => pr.ageHours >= 48);
-    if (currentFilter === 'new')               prs = prs.filter(pr => pr.ageHours < 24);
-    if (currentFilter === 'new_comments')      prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0);
-    if (currentFilter === 'changes_requested') prs = prs.filter(pr => pr.iChangesRequested || pr.anyChangesRequested);
+    if (currentFilter === 'new')           prs = prs.filter(pr => pr.ageHours < 24);
+    if (currentFilter === 'new_comments')  prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0);
+    if (currentFilter === 'stale')         prs = prs.filter(pr => pr.updatedAgo >= 120);
     return prs;
 }
 
@@ -252,25 +254,19 @@ function ageLabel(h) {
     return `${Math.floor(h / 24)}d`;
 }
 function ageClass(h) {
-    if (h >= 72) return 'crit';
-    if (h >= 48) return 'warn';
+    if (h >= 120) return 'crit'; // ≥5d
+    if (h >= 48)  return 'warn'; // ≥2d
     return '';
 }
 function cardClass(pr) {
-    const h = pr.ageHours;
-    if (currentMode === 'review_requested' || currentMode === 'other') {
-        if (pr.iChangesRequested)  return 'changes-requested';
-        if (h >= 48)               return 'stale';
-        if (h < 24)                return 'fresh';
-        return '';
-    }
-    if (currentMode === 'my_prs') {
+    if (currentMode === 'review_requested' || currentMode === 'other' || currentMode === 'my_prs') {
         if (pr.anyChangesRequested) return 'changes-requested';
         if (pr.approvedCount >= 2)  return 'fresh';
         return '';
     }
-    if (currentMode === 'approved') {
-        if (h >= 48) return 'stale';
+    if (currentMode === 'reviewed') {
+        if (pr.iChangesRequested) return 'changes-requested';
+        if (pr.iApproved)         return 'fresh';
         return '';
     }
     return '';
@@ -328,7 +324,7 @@ function renderPRs() {
                     <img class="avatar" src="${pr.authorAvatar}" alt="${pr.author}">
                     ${pr.author}
                   </span>
-                  <span class="age-badge ${ageClass(pr.ageHours)}">⧗ ${ageLabel(pr.ageHours)}</span>
+                  <span class="age-badge ${ageClass(pr.updatedAgo)}">⧗ ${ageLabel(pr.updatedAgo)}</span>
                   ${humanChip}
                   ${copilotChip}
                 </div>
@@ -347,7 +343,7 @@ function updateStats() {
     let prs = allPRs;
     if (prefixes.length) prs = prs.filter(pr => prefixes.some(p => pr.repoName.startsWith(p)));
     document.getElementById('statTotal').textContent = prs.length;
-    document.getElementById('statStale').textContent = prs.filter(p => p.ageHours >= 48).length;
+    document.getElementById('statStale').textContent = prs.filter(p => p.updatedAgo >= 120).length;
     document.getElementById('statNew').textContent   = prs.filter(p => p.ageHours < 24).length;
 }
 
@@ -396,10 +392,30 @@ function markSeen(prNumber, commentCount) {
     catch { /* storage full */ }
 }
 
+function markSeenFull(pr) {
+    const seen = seenLoad();
+    seen[pr.number] = {
+        commentCount:       pr.commentCount,
+        approvedCount:      pr.approvedCount,
+        anyChangesRequested: pr.anyChangesRequested,
+        seenAt:             Date.now(),
+    };
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); }
+    catch { /* storage full */ }
+}
+
 function newCommentCount(prNumber, currentCount) {
     const entry = seenLoad()[prNumber];
     if (!entry) return 0;
     return Math.max(0, currentCount - entry.commentCount);
+}
+
+function hasNewActivity(pr) {
+    const entry = seenLoad()[pr.number];
+    if (!entry) return false;
+    return pr.commentCount > entry.commentCount ||
+           pr.approvedCount > (entry.approvedCount ?? 0) ||
+           (pr.anyChangesRequested && !entry.anyChangesRequested);
 }
 
 // ── CI cache ───────────────────────────────────────────
@@ -487,7 +503,7 @@ const GQL_SEARCH = `
       pageInfo { hasNextPage endCursor }
       nodes {
         ... on PullRequest {
-          number title url createdAt headRefOid state isDraft
+          number title url createdAt updatedAt headRefOid state isDraft
               labels(first: 10) { nodes { name color } }
               assignees(first: 10) { nodes { login } }
               reviewThreads(first: 100) {
@@ -576,8 +592,9 @@ async function loadPRs() {
             // latest review state per author (last review wins)
             const latestByAuthor = {};
             reviews.forEach(r => { latestByAuthor[r.author?.login] = r.state; });
-            const iChangesRequested = latestByAuthor[viewerLogin] === 'CHANGES_REQUESTED';
-            const approvedCount     = Object.values(latestByAuthor).filter(s => s === 'APPROVED').length;
+            const iChangesRequested   = latestByAuthor[viewerLogin] === 'CHANGES_REQUESTED';
+            const iApproved           = latestByAuthor[viewerLogin] === 'APPROVED';
+            const approvedCount       = Object.values(latestByAuthor).filter(s => s === 'APPROVED').length;
             const anyChangesRequested = Object.values(latestByAuthor).some(s => s === 'CHANGES_REQUESTED');
             return {
                 number:             node.number,
@@ -587,10 +604,12 @@ async function loadPRs() {
                 author:             node.author?.login ?? 'unknown',
                 authorAvatar:       (node.author?.avatarUrl ?? '') + '&s=32',
                 ageHours:           ageHours(node.createdAt),
+                updatedAgo:         ageHours(node.updatedAt),
                 commentCount:       humanCommentCount,
                 copilotUnresolved,
                 ci,
                 iChangesRequested,
+                iApproved,
                 approvedCount,
                 anyChangesRequested,
                 isDraft:            node.isDraft,
@@ -599,8 +618,8 @@ async function loadPRs() {
             };
         }));
 
-        // sort newest first
-        enriched.sort((a, b) => a.ageHours - b.ageHours);
+        // sort by last activity — most recently updated first
+        enriched.sort((a, b) => a.updatedAgo - b.updatedAgo);
 
         allPRs = enriched;
         dot.className = 'dot live';
@@ -608,13 +627,22 @@ async function loadPRs() {
         renderPRs();
         updateStats();
 
-        // notify if new PRs appeared while tab was inactive
-        const currentCount = filteredPRs().length;
-        if (document.visibilityState === 'hidden' && lastSeenCount !== null && currentCount > lastSeenCount) {
-            setUnread(currentCount - lastSeenCount);
-        } else if (document.visibilityState === 'visible') {
-            lastSeenCount = currentCount;
-            setUnread(0);
+        // notify if new PRs appeared or new activity on my PRs while tab was inactive
+        if (document.visibilityState === 'hidden') {
+            const currentCount = filteredPRs().length;
+            const newPRs = lastSeenCount !== null && currentCount > lastSeenCount;
+            const newMyPRActivity = allPRs
+                .filter(pr => pr.author === viewerLogin)
+                .some(pr => hasNewActivity(pr));
+            if (newPRs || newMyPRActivity) {
+                const n = newPRs ? currentCount - lastSeenCount : 0;
+                setUnread(n, newMyPRActivity);
+            }
+        } else {
+            lastSeenCount = filteredPRs().length;
+            // snapshot my PRs state for future comparison
+            allPRs.filter(pr => pr.author === viewerLogin).forEach(markSeenFull);
+            setUnread(0, false);
         }
 
     } catch (err) {
