@@ -241,7 +241,7 @@ function filteredPRs() {
     }
     if (!showDrafts(currentMode)) prs = prs.filter(pr => !pr.isDraft);
     if (currentFilter === 'new')           prs = prs.filter(pr => pr.ageHours < 24);
-    if (currentFilter === 'new_comments')  prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0);
+    if (currentFilter === 'new_comments')  prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0 || newThreadCount(pr.number, pr.threadCount) > 0);
     if (currentFilter === 'stale')         prs = prs.filter(pr => pr.updatedAgo >= 120);
     return prs;
 }
@@ -299,8 +299,12 @@ function renderPRs() {
 
     list.innerHTML = prs.map((pr, i) => {
         const newComments = newCommentCount(pr.number, pr.commentCount);
-        const humanChip = pr.commentCount > 0
-            ? `<span class="meta-chip">◎ ${pr.commentCount} comments${newComments > 0 ? ` <span class="new-comments">(+${newComments} new)</span>` : ''}</span>`
+        const newThreads  = newThreadCount(pr.number, pr.threadCount);
+        const humanChip = (pr.threadCount > 0 || pr.commentCount > 0)
+            ? `<span class="meta-chip">◎ ${pr.threadCount} threads${newThreads > 0 ? ` <span class="new-comments">(+${newThreads})</span>` : ''}</span>`
+            : '';
+        const commentsChip = pr.commentCount > 0
+            ? `<span class="meta-chip">· ${pr.commentCount} comments${newComments > 0 ? ` <span class="new-comments">(+${newComments} new)</span>` : ''}</span>`
             : '';
         const copilotChip = pr.copilotUnresolved > 0
             ? `<span class="meta-chip copilot-chip">⬡ ${pr.copilotUnresolved} copilot</span>`
@@ -312,7 +316,7 @@ function renderPRs() {
         return `
             <a class="pr-card ${cardClass(pr)}" href="${pr.url}" target="_blank"
                style="animation-delay:${i * 30}ms"
-               onclick="markSeen(${pr.number}, ${pr.commentCount})">
+               onclick="markSeen({number:${pr.number},commentCount:${pr.commentCount},threadCount:${pr.threadCount}})">
               <div class="pr-main">
                 <div class="pr-repo">${pr.repoName}</div>
                 <div class="pr-title-row">
@@ -327,6 +331,7 @@ function renderPRs() {
                   <span class="age-badge ${ageClass(pr.updatedAgo)}">⧗ ${ageLabel(pr.updatedAgo)}</span>
                   ${humanChip}
                   ${copilotChip}
+                  ${commentsChip}
                 </div>
               </div>
               <div class="pr-right">
@@ -385,9 +390,13 @@ function seenLoad() {
     catch { return {}; }
 }
 
-function markSeen(prNumber, commentCount) {
+function markSeen(pr) {
     const seen = seenLoad();
-    seen[prNumber] = { commentCount, seenAt: Date.now() };
+    seen[pr.number] = {
+        commentCount: pr.commentCount,
+        threadCount:  pr.threadCount,
+        seenAt:       Date.now(),
+    };
     try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); }
     catch { /* storage full */ }
 }
@@ -395,10 +404,12 @@ function markSeen(prNumber, commentCount) {
 function markSeenFull(pr) {
     const seen = seenLoad();
     seen[pr.number] = {
-        commentCount:       pr.commentCount,
-        approvedCount:      pr.approvedCount,
+        commentCount:        pr.commentCount,
+        threadCount:         pr.threadCount,
+        totalComments:       pr.totalComments,
+        approvedCount:       pr.approvedCount,
         anyChangesRequested: pr.anyChangesRequested,
-        seenAt:             Date.now(),
+        seenAt:              Date.now(),
     };
     try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); }
     catch { /* storage full */ }
@@ -410,11 +421,17 @@ function newCommentCount(prNumber, currentCount) {
     return Math.max(0, currentCount - entry.commentCount);
 }
 
+function newThreadCount(prNumber, currentCount) {
+    const entry = seenLoad()[prNumber];
+    if (!entry) return 0;
+    return Math.max(0, currentCount - (entry.threadCount ?? 0));
+}
+
 function hasNewActivity(pr) {
     const entry = seenLoad()[pr.number];
     if (!entry) return false;
-    return pr.commentCount > entry.commentCount ||
-           pr.approvedCount > (entry.approvedCount ?? 0) ||
+    return pr.totalComments   > (entry.totalComments   ?? 0) ||
+           pr.approvedCount   > (entry.approvedCount   ?? 0) ||
            (pr.anyChangesRequested && !entry.anyChangesRequested);
 }
 
@@ -504,12 +521,13 @@ const GQL_SEARCH = `
       nodes {
         ... on PullRequest {
           number title url createdAt updatedAt headRefOid state isDraft
-              labels(first: 10) { nodes { name color } }
-              assignees(first: 10) { nodes { login } }
-              reviewThreads(first: 100) {
+              labels(first: 5) { nodes { name color } }
+              assignees(first: 5) { nodes { login } }
+              reviewThreads(first: 50) {
                 nodes {
                   isResolved
-                  comments(first: 1) {
+                  comments(first: 25) {
+                    totalCount
                     nodes { author { login } }
                   }
                 }
@@ -586,8 +604,14 @@ async function loadPRs() {
                 login === 'copilot-pull-request-reviewer[bot]' ||
                 login.startsWith('copilot')
             );
-            const humanCommentCount = threads.filter(t => !isCopilot(t.comments.nodes[0]?.author?.login)).length;
-            const copilotUnresolved = threads.filter(t => !t.isResolved && isCopilot(t.comments.nodes[0]?.author?.login)).length;
+            const humanThreads   = threads.filter(t => !isCopilot(t.comments.nodes[0]?.author?.login));
+            const copilotThreads = threads.filter(t =>  isCopilot(t.comments.nodes[0]?.author?.login));
+
+            const humanUnresolvedThreads  = humanThreads.filter(t => !t.isResolved).length;
+            const unresolvedComments      = threads.filter(t => !t.isResolved)
+                                                .reduce((s, t) => s + t.comments.totalCount, 0);
+            const humanTotalComments      = threads.reduce((s, t) => s + t.comments.totalCount, 0);
+            const copilotUnresolved       = copilotThreads.filter(t => !t.isResolved).length;
             const reviews  = node.reviews?.nodes ?? [];
             // latest review state per author (last review wins)
             const latestByAuthor = {};
@@ -605,7 +629,9 @@ async function loadPRs() {
                 authorAvatar:       (node.author?.avatarUrl ?? '') + '&s=32',
                 ageHours:           ageHours(node.createdAt),
                 updatedAgo:         ageHours(node.updatedAt),
-                commentCount:       humanCommentCount,
+                commentCount:       unresolvedComments,
+                threadCount:        humanUnresolvedThreads,
+                totalComments:      humanTotalComments,
                 copilotUnresolved,
                 ci,
                 iChangesRequested,

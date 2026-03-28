@@ -57,7 +57,7 @@ favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
 - Manual refresh button + **auto-refresh** (configurable interval: 5/15/30/60 min, on/off toggle)
 - Pagination: up to 200 PRs (4 pages × 50 via GraphQL cursor)
 - **CI status cache** in `localStorage` keyed by commit SHA, with TTL (pass: 7d, fail: 1h, none: 7d), LRU eviction at 500 entries
-- **New comment tracking**: records comment count + timestamp on PR click; shows `N comments (+X new)` if count increased since last visit; human threads and Copilot unresolved shown separately
+- **New comment tracking**: on PR click records `{ threadCount, commentCount, totalComments, approvedCount, anyChangesRequested }`; shows unresolved threads + comments with `(+N new)` since last visit; human and Copilot unresolved shown separately
 - **Config export/import**: copy/paste JSON `{ token, prefixes, includeAssigned }` in Settings drawer
 - **Hash router**: `location.hash` reflects current mode; survives page refresh
 - **Sort**: always by last activity (`updatedAt`) DESC — most recently active first
@@ -150,8 +150,9 @@ Each PR card shows:
 | Labels + draft | `labels.nodes`, `isDraft` | Inline after title, colour-coded chips |
 | Author | `author.login` + `avatarUrl` | Meta row, avatar 20×20 |
 | Age (last activity) | `updatedAt` → now delta | Meta row, format `<1h / Xh / Xd`; yellow ≥2d, red ≥5d |
-| Human review threads | `reviewThreads` (non-Copilot) | Meta row, `◎ N comments (+X new)` |
+| Human review threads | `reviewThreads` (non-Copilot, unresolved only) | Meta row, `◎ N threads (+N)` |
 | Copilot unresolved | `reviewThreads` (Copilot bot, unresolved) | Meta row, `⬡ N copilot` (blue) |
+| Comments | sum of all unresolved threads (human + copilot) | Meta row, `· N comments (+N new)` |
 | PR number | `number` | Top-right column |
 | CI status | derived (FR-03) | Bottom-right column, colour-coded badge |
 
@@ -209,7 +210,7 @@ All user config survives page reload:
 | `pr_token` | string, raw PAT |
 | `pr_prefixes` | JSON array of strings |
 | `pr_ci_cache` | JSON object, SHA → `{ status, expiresAt, accessedAt }` |
-| `pr_seen` | JSON object, PR number → `{ commentCount, approvedCount, anyChangesRequested, seenAt }` |
+| `pr_seen` | JSON object, PR number → `{ commentCount, threadCount, totalComments, approvedCount, anyChangesRequested, seenAt }` |
 | `pr_auto_refresh` | `"true"` / `"false"` |
 | `pr_auto_refresh_freq` | number (minutes) |
 | `pr_show_drafts_{mode}` | `"true"` / `"false"` per mode |
@@ -232,7 +233,7 @@ When auto-refresh fires while the tab is inactive:
 - Tab title: `(N new) PR Inbox`
 
 **My PR activity** — any PR where `author === viewerLogin` has:
-- more comments than last snapshot, or
+- `totalComments` (sum across **all** threads, human+copilot, resolved+unresolved) increased since last snapshot — catches new comments even in resolved/re-opened threads, or
 - more APPROVEDs than last snapshot, or
 - new CHANGES_REQUESTED that wasn't there before
 - Tab title: `(activity) PR Inbox`
@@ -273,10 +274,16 @@ Headers:
 
 Query fields used per PR node:
   number, title, url, createdAt, updatedAt, headRefOid, state, isDraft
-  labels(first: 10) { nodes { name color } }
-  assignees(first: 10) { nodes { login } }
-  reviewThreads(first: 100) {
-    nodes { isResolved, comments(first: 1) { nodes { author { login } } } }
+  labels(first: 5) { nodes { name color } }
+  assignees(first: 5) { nodes { login } }
+  reviewThreads(first: 50) {
+    nodes {
+      isResolved
+      comments(first: 25) {
+        totalCount
+        nodes { author { login } }
+      }
+    }
   }
   reviews(last: 50) { nodes { state, author { login } } }
   repository { name, owner { login } }
