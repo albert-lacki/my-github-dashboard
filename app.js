@@ -25,6 +25,91 @@ function updateDraftToggle() {
     btn.classList.toggle('active', on);
 }
 
+// ── Notifications (favicon + tab title) ───────────────
+let lastSeenCount = null; // PR count when tab was last active
+let hasUnread = false;
+
+function buildFaviconUrl(color) {
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const ctx = c.getContext('2d');
+
+    // background rounded rect
+    ctx.fillStyle = '#13161b';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, 32, 32, 6);
+    ctx.fill();
+
+    // border
+    ctx.strokeStyle = '#232830';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(0.5, 0.5, 31, 31, 5.5);
+    ctx.stroke();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // arrow up (branch line)
+    ctx.beginPath();
+    ctx.moveTo(10, 22); ctx.lineTo(10, 10);
+    ctx.stroke();
+    // arrowhead
+    ctx.beginPath();
+    ctx.moveTo(6, 14); ctx.lineTo(10, 10); ctx.lineTo(14, 14);
+    ctx.stroke();
+
+    // top dot
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(22, 10, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // bottom dot
+    ctx.beginPath();
+    ctx.arc(22, 22, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // connecting curve
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(22, 13.5);
+    ctx.quadraticCurveTo(22, 17, 18, 17);
+    ctx.lineTo(14.5, 17);
+    ctx.stroke();
+
+    return c.toDataURL('image/png');
+}
+
+function setFavicon(color) {
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.type = 'image/png';
+    link.href = buildFaviconUrl(color);
+}
+
+function setUnread(count) {
+    hasUnread = count > 0;
+    if (hasUnread) {
+        document.title = `(${count} new) PR Inbox`;
+        setFavicon('#fbbf24'); // yellow
+    } else {
+        document.title = 'PR Inbox';
+        setFavicon('#4ade80'); // green
+    }
+}
+
+// track visibility — clear unread when user comes back to tab
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        lastSeenCount = filteredPRs().length;
+        setUnread(0);
+    }
+});
+
 // ── Auto-refresh ───────────────────────────────────────
 let autoRefreshTimer = null;
 const AUTO_REFRESH_KEY      = 'pr_auto_refresh';
@@ -487,14 +572,29 @@ async function loadPRs() {
         }
 
         let nodes = [];
-        let after = null;
-        for (let page = 0; page < 4; page++) {
-            const data = await ghGraphQL(GQL_SEARCH, { query: MODE_QUERIES[currentMode], after }, token);
-            const { nodes: pageNodes, pageInfo } = data.search;
-            nodes = nodes.concat(pageNodes.filter(n => n.number && n.state === 'OPEN'));
-            if (!pageInfo.hasNextPage) break;
-            after = pageInfo.endCursor;
+
+        // For review_requested and other: also fetch PRs where we gave CHANGES_REQUESTED
+        // (GitHub removes reviewer from reviewRequests after review, so they disappear from review-requested:@me)
+        const needsChangesRequestedMerge = currentMode === 'review_requested' || currentMode === 'other';
+        const queries = [MODE_QUERIES[currentMode]];
+        if (needsChangesRequestedMerge) {
+            queries.push(`is:pr is:open reviewed-by:${viewerLogin}`);
         }
+
+        for (const q of queries) {
+            let after = null;
+            for (let page = 0; page < 4; page++) {
+                const data = await ghGraphQL(GQL_SEARCH, { query: q, after }, token);
+                const { nodes: pageNodes, pageInfo } = data.search;
+                nodes = nodes.concat(pageNodes.filter(n => n.number && n.state === 'OPEN'));
+                if (!pageInfo.hasNextPage) break;
+                after = pageInfo.endCursor;
+            }
+        }
+
+        // deduplicate by PR number (second query may overlap with first)
+        const seen = new Set();
+        nodes = nodes.filter(n => seen.has(n.number) ? false : seen.add(n.number));
 
         const enriched = await Promise.all(nodes.map(async node => {
             const owner    = node.repository.owner.login;
@@ -537,11 +637,29 @@ async function loadPRs() {
         // sort newest first
         enriched.sort((a, b) => a.ageHours - b.ageHours);
 
+        // for review_requested/other: keep from the merged reviewed-by set only those
+        // where viewer gave CHANGES_REQUESTED — drop the rest (they belong to 'approved')
+        const finalPRs = needsChangesRequestedMerge
+            ? enriched.filter(pr => {
+                const fromReviewRequested = pr._fromReviewRequested;
+                return fromReviewRequested || pr.iChangesRequested;
+              })
+            : enriched;
+
         allPRs = enriched;
         dot.className = 'dot live';
         statusText.textContent = `updated ${new Date().toLocaleTimeString()}`;
         renderPRs();
         updateStats();
+
+        // notify if new PRs appeared while tab was inactive
+        const currentCount = filteredPRs().length;
+        if (document.visibilityState === 'hidden' && lastSeenCount !== null && currentCount > lastSeenCount) {
+            setUnread(currentCount - lastSeenCount);
+        } else if (document.visibilityState === 'visible') {
+            lastSeenCount = currentCount;
+            setUnread(0);
+        }
 
     } catch (err) {
         dot.className = 'dot error';
@@ -577,6 +695,7 @@ function showToast(msg) {
     restoreModeFromHash();
     updateDraftToggle();
     scheduleAutoRefresh();
+    setFavicon('#4ade80'); // init with green
     if (loadToken()) loadPRs();
 })();
 
