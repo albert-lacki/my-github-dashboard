@@ -40,6 +40,11 @@
                        onkeydown="if(event.key==='Enter') addPrefix()">
                 <button class="btn-add" onclick="addPrefix()">+</button>
             </div>
+            <label class="toggle-label" style="margin-top:10px">
+                <input type="checkbox" id="includeAssignedToggle"
+                       onchange="saveIncludeAssigned(this.checked)">
+                include assigned PRs
+            </label>
         </div>
         <div class="sidebar-section">
             <div class="sidebar-label">Auto-refresh</div>

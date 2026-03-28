@@ -124,7 +124,11 @@ function restoreModeFromHash() {
 
 // ── Config export / import ─────────────────────────────
 function exportConfig() {
-    const config = JSON.stringify({ token: loadToken(), prefixes: loadPrefixes() }, null, 2);
+    const config = JSON.stringify({
+        token: loadToken(),
+        prefixes: loadPrefixes(),
+        includeAssigned: loadIncludeAssigned(),
+    }, null, 2);
     navigator.clipboard.writeText(config)
         .then(() => showToast('Config copied to clipboard.'))
         .catch(() => showToast('Clipboard unavailable — copy manually from textarea.'));
@@ -138,6 +142,10 @@ function importConfig() {
         const config = JSON.parse(raw);
         if (config.token)    { saveToken(config.token); document.getElementById('tokenInput').value = config.token; }
         if (Array.isArray(config.prefixes)) { savePrefixes(config.prefixes); renderPrefixes(); }
+        if (config.includeAssigned !== undefined) {
+            localStorage.setItem('pr_include_assigned', config.includeAssigned);
+            document.getElementById('includeAssignedToggle').checked = config.includeAssigned;
+        }
         document.getElementById('configImport').value = '';
         showToast('Config imported.');
         if (loadToken()) loadPRs();
@@ -166,6 +174,12 @@ function savePrefixes(arr) { localStorage.setItem('pr_prefixes', JSON.stringify(
 function loadPrefixes() {
     try { return JSON.parse(localStorage.getItem('pr_prefixes')) || []; }
     catch { return []; }
+}
+function loadIncludeAssigned() { return localStorage.getItem('pr_include_assigned') !== 'false'; }
+function saveIncludeAssigned(val) {
+    localStorage.setItem('pr_include_assigned', val);
+    renderPRs();
+    updateStats();
 }
 
 // ── Token UI ───────────────────────────────────────────
@@ -211,10 +225,15 @@ function filteredPRs() {
     const prefixes = loadPrefixes();
     let prs = allPRs;
     if (currentMode === 'other') {
-        // show only PRs that don't match any prefix (the "noise" outside your filter list)
         if (prefixes.length) prs = prs.filter(pr => !prefixes.some(p => pr.repoName.startsWith(p)));
     } else {
-        if (prefixes.length) prs = prs.filter(pr => prefixes.some(p => pr.repoName.startsWith(p)));
+        if (prefixes.length) {
+            const includeAssigned = loadIncludeAssigned();
+            prs = prs.filter(pr =>
+                prefixes.some(p => pr.repoName.startsWith(p)) ||
+                (includeAssigned && pr.isAssigned)
+            );
+        }
     }
     if (!showDrafts(currentMode)) prs = prs.filter(pr => !pr.isDraft);
     if (currentFilter === 'ci_pass')          prs = prs.filter(pr => pr.ci === 'pass');
@@ -470,6 +489,7 @@ const GQL_SEARCH = `
         ... on PullRequest {
           number title url createdAt headRefOid state isDraft
               labels(first: 10) { nodes { name color } }
+              assignees(first: 10) { nodes { login } }
               reviewThreads(first: 100) {
                 nodes {
                   isResolved
@@ -535,9 +555,10 @@ async function loadPRs() {
             }
         }
 
-        // deduplicate by PR number (second query may overlap with first)
-        const seen = new Set();
-        nodes = nodes.filter(n => seen.has(n.number) ? false : seen.add(n.number));
+        // deduplicate — keep last occurrence so reviewed-by data wins over review-requested
+        const byNumber = new Map();
+        nodes.forEach(n => byNumber.set(n.number, n));
+        nodes = [...byNumber.values()];
 
         const enriched = await Promise.all(nodes.map(async node => {
             const owner    = node.repository.owner.login;
@@ -574,20 +595,12 @@ async function loadPRs() {
                 anyChangesRequested,
                 isDraft:            node.isDraft,
                 labels:             node.labels?.nodes ?? [],
+                isAssigned:         (node.assignees?.nodes ?? []).some(a => a.login === viewerLogin),
             };
         }));
 
         // sort newest first
         enriched.sort((a, b) => a.ageHours - b.ageHours);
-
-        // for review_requested/other: keep from the merged reviewed-by set only those
-        // where viewer gave CHANGES_REQUESTED — drop the rest (they belong to 'approved')
-        const finalPRs = needsChangesRequestedMerge
-            ? enriched.filter(pr => {
-                const fromReviewRequested = pr._fromReviewRequested;
-                return fromReviewRequested || pr.iChangesRequested;
-              })
-            : enriched;
 
         allPRs = enriched;
         dot.className = 'dot live';
@@ -634,6 +647,7 @@ function showToast(msg) {
     document.getElementById('tokenInput').value = loadToken();
     document.getElementById('autoRefreshToggle').checked = autoRefreshEnabled();
     document.getElementById('autoRefreshFreq').value = autoRefreshFreq();
+    document.getElementById('includeAssignedToggle').checked = loadIncludeAssigned();
     renderPrefixes();
     restoreModeFromHash();
     updateDraftToggle();

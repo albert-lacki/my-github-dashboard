@@ -1,7 +1,7 @@
 # PR Inbox — Product Spec
 
 **Status:** implemented  
-**Last updated:** 2026-03-26  
+**Last updated:** 2026-03-28  
 **Owner:** Albert
 
 ---
@@ -31,10 +31,11 @@ Single user (self-hosted tool). No auth system, no multi-tenancy. Configuration 
 ## File Structure
 
 ```
-index.html   — markup only
-app.css      — all styles
-app.js       — all logic
-favicon.svg  — SVG favicon (PR diagram motif, green on dark)
+index.html         — markup only
+app.css            — all styles
+app.js             — all logic
+favicon.svg        — SVG favicon, green (default state)
+favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
 ```
 
 ---
@@ -56,11 +57,14 @@ favicon.svg  — SVG favicon (PR diagram motif, green on dark)
 - Manual refresh button + **auto-refresh** (configurable interval: 5/15/30/60 min, on/off toggle)
 - Pagination: up to 200 PRs (4 pages × 50 via GraphQL cursor)
 - **CI status cache** in `localStorage` keyed by commit SHA, with TTL (pass: 7d, fail: 1h, none: 7d), LRU eviction at 500 entries
-- **New comment tracking**: records comment count + timestamp on PR click; shows `+N new` if count increased since last visit
-- **Config export/import**: copy/paste JSON `{ token, prefixes }` in Settings drawer
+- **New comment tracking**: records comment count + timestamp on PR click; shows `N comments (+X new)` if count increased since last visit; human threads and Copilot unresolved shown separately
+- **Config export/import**: copy/paste JSON `{ token, prefixes, includeAssigned }` in Settings drawer
 - **Hash router**: `location.hash` reflects current mode; survives page refresh
 - **Sort**: always newest first (by `createdAt`)
 - **Draft visibility toggle**: per-mode, persisted; default OFF except `my_prs`
+- **Include assigned PRs toggle**: when ON, PRs where viewer is assignee are shown regardless of prefix filter; persisted in localStorage; default ON
+- **Background refresh notifications**: yellow favicon (`favicon-alert.svg`) + `(N new) PR Inbox` tab title when new PRs appear during auto-refresh while tab is inactive; resets on tab focus
+- **`CHANGES_REQUESTED` visibility**: second GraphQL query (`reviewed-by:@me`) ensures PRs where viewer gave changes requested still appear even after GitHub removes them from `review-requested`
 
 ### Out of scope
 
@@ -93,6 +97,7 @@ favicon.svg  — SVG favicon (PR diagram motif, green on dark)
 - On error, surface message in UI and set status indicator to error state
 - PRs are sorted newest first after fetch (`createdAt` ASC by age)
 - Auto-refresh via `setInterval` when enabled; timer resets on settings change
+- For `review_requested` and `other` modes, a second query (`reviewed-by:@me`) is merged to capture PRs where viewer gave `CHANGES_REQUESTED` (GitHub removes them from `review-requested` after review is submitted). Results are deduplicated by PR number, last occurrence wins.
 
 #### Mode queries
 
@@ -141,7 +146,7 @@ Each PR card shows:
 | Labels + draft | `labels.nodes`, `isDraft` | Inline after title, colour-coded chips |
 | Author | `author.login` + `avatarUrl` | Meta row, avatar 20×20 |
 | Age | `createdAt` → now delta | Meta row, format `<1h / Xh / Xd` |
-| Human review threads | `reviewThreads` (non-Copilot) | Meta row, `◎ N (+X new)` |
+| Human review threads | `reviewThreads` (non-Copilot) | Meta row, `◎ N comments (+X new)` |
 | Copilot unresolved | `reviewThreads` (Copilot bot, unresolved) | Meta row, `⬡ N copilot` (blue) |
 | PR number | `number` | Top-right column |
 | CI status | derived (FR-03) | Bottom-right column, colour-coded badge |
@@ -206,15 +211,23 @@ All user config survives page reload:
 | `pr_auto_refresh` | `"true"` / `"false"` |
 | `pr_auto_refresh_freq` | number (minutes) |
 | `pr_show_drafts_{mode}` | `"true"` / `"false"` per mode |
+| `pr_include_assigned` | `"true"` / `"false"` |
 
 ### FR-11 — Settings Drawer
 
 Slide-in drawer (left side), opened via `☰` button in topbar:
 
 - **GitHub Token** — masked input with eye toggle
-- **Repo Prefixes** — tag list with add/remove
+- **Repo Prefixes** — tag list with add/remove; toggle "include assigned PRs" (default ON)
 - **Auto-refresh** — checkbox (enable/disable) + frequency select (5/15/30/60 min)
-- **Config** — "copy as JSON" button (exports `{ token, prefixes }` to clipboard + textarea) + textarea for paste + "import JSON" button (auto-imports on paste)
+- **Config** — "copy as JSON" button (exports `{ token, prefixes, includeAssigned }` to clipboard + textarea) + textarea for paste + "import JSON" button (auto-imports on paste)
+
+### FR-13 — Background Notifications
+
+When auto-refresh fires while the tab is inactive and the filtered PR count has increased:
+- Tab title changes to `(N new) PR Inbox`
+- Favicon switches from `favicon.svg` (green) to `favicon-alert.svg` (yellow)
+- Both reset to default when the user returns to the tab (`visibilitychange` event)
 
 ### FR-12 — Hash Router
 
@@ -247,6 +260,7 @@ Headers:
 Query fields used per PR node:
   number, title, url, createdAt, headRefOid, state, isDraft
   labels(first: 10) { nodes { name color } }
+  assignees(first: 10) { nodes { login } }
   reviewThreads(first: 100) {
     nodes { isResolved, comments(first: 1) { nodes { author { login } } } }
   }
