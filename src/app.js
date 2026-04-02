@@ -644,10 +644,17 @@ async function loadPRs() {
             };
         }));
 
-        // sort by last activity — most recently updated first
-        enriched.sort((a, b) => a.updatedAgo - b.updatedAgo);
+        // For review_requested / other: drop PRs where we already approved (but keep ones
+        // where we gave CHANGES_REQUESTED — GitHub removes those from review-requested:@me after review).
+        let finalEnriched = enriched;
+        if (needsChangesRequestedMerge) {
+            finalEnriched = enriched.filter(pr => !pr.iApproved || pr.iChangesRequested);
+        }
 
-        allPRs = enriched;
+        // sort by last activity — most recently updated first
+        finalEnriched.sort((a, b) => a.updatedAgo - b.updatedAgo);
+
+        allPRs = finalEnriched;
         dot.className = 'dot live';
         statusText.textContent = `updated ${new Date().toLocaleTimeString()}`;
         renderPRs();

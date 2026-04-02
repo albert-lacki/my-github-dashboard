@@ -1,7 +1,7 @@
 # PR Inbox — Product Spec
 
 **Status:** implemented  
-**Last updated:** 2026-03-28
+**Last updated:** 2026-04-02
 **Owner:** Albert
 
 ---
@@ -30,13 +30,37 @@ Single user (self-hosted tool). No auth system, no multi-tenancy. Configuration 
 
 ## File Structure
 
+### Source (`src/`)
+
 ```
-index.html         — markup only
-app.css            — all styles
-app.js             — all logic
-favicon.svg        — SVG favicon, green (default state)
-favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
+src/index.html         — markup only
+src/app.css            — all styles
+src/app.js             — all logic
+src/favicon.svg        — SVG favicon, green (default state)
+src/favicon-alert.svg  — SVG favicon, yellow (unread PRs while tab inactive)
 ```
+
+### Repo root
+
+```
+build.sh           — build script: copies src/ → dist/, packs → pr-inbox.zip
+README.md          — setup & deployment guide
+spec.md            — this document
+```
+
+### Deploy package
+
+Run `./build.sh` to produce `pr-inbox.zip` containing only the files required at runtime:
+
+```
+index.html
+app.css
+app.js
+favicon.svg
+favicon-alert.svg
+```
+
+`dist/` and `*.zip` are git-ignored. Upload `pr-inbox.zip` directly to Ring Pages (or any static host).
 
 ---
 
