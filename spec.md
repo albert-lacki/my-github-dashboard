@@ -125,7 +125,7 @@ favicon-alert.svg
 - On error, surface message in UI and set status indicator to error state
 - PRs are sorted newest first after fetch (`createdAt` ASC by age)
 - Auto-refresh via `setInterval` when enabled; timer resets on settings change
-- For `review_requested` and `other` modes, a second query (`reviewed-by:@me`) is merged to capture PRs where viewer gave `CHANGES_REQUESTED` (GitHub removes them from `review-requested` after review is submitted). Results are deduplicated by PR number, last occurrence wins.
+- For `review_requested` and `other` modes, a second query (`reviewed-by:@me`) is merged to capture PRs where viewer gave `CHANGES_REQUESTED` (GitHub removes them from `review-requested` after review is submitted). Results are deduplicated by `owner/repo#number` key (not just PR number) to avoid cross-repository collisions where two different repos share the same PR number.
 
 #### Mode queries
 

@@ -299,6 +299,8 @@ body::before {
     margin-bottom: 8px;
 }
 .btn-config:hover { border-color: var(--accent); color: var(--accent); }
+.btn-config.btn-danger { border-color: #7a2222; color: #c0392b; }
+.btn-config.btn-danger:hover { border-color: #c0392b; color: #e74c3c; background: #2a1515; }
 
 .config-import {
     width: 100%;

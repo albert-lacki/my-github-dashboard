@@ -589,9 +589,10 @@ async function loadPRs() {
             }
         }
 
-        // deduplicate — keep last occurrence so reviewed-by data wins over review-requested
+        // deduplicate — use repo+number as key to avoid cross-repo collisions
+        // keep last occurrence so reviewed-by data wins over review-requested
         const byNumber = new Map();
-        nodes.forEach(n => byNumber.set(n.number, n));
+        nodes.forEach(n => byNumber.set(`${n.repository.owner.login}/${n.repository.name}#${n.number}`, n));
         nodes = [...byNumber.values()];
 
         const enriched = await Promise.all(nodes.map(async node => {
@@ -686,6 +687,14 @@ async function loadPRs() {
     } finally {
         btn.disabled = false;
     }
+}
+
+// ── Cache management ───────────────────────────────────
+function clearAllCache() {
+    localStorage.removeItem(CI_CACHE_KEY);
+    localStorage.removeItem(SEEN_KEY);
+    showToast('Cache cleared — reloading…');
+    setTimeout(() => loadPRs(), 500);
 }
 
 // ── Toast ──────────────────────────────────────────────
