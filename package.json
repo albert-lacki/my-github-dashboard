@@ -1,0 +1,33 @@
+{
+    "name": "my-github-dashboard",
+    "private": true,
+    "engines": {
+        "node": "^22"
+    },
+    "scripts": {
+        "lint": "npm run lint:js && npm run lint:css",
+        "lint:js": "eslint --ext .js src/",
+        "lint:js:fix": "npm run lint:js -- --fix",
+        "lint:css": "stylelint 'src/**/*.css'",
+        "lint:css:fix": "npm run lint:css -- --fix"
+    },
+    "devDependencies": {
+        "@ringieraxelspringer/eslint-config": "^24.0.0",
+        "@ringieraxelspringer/stylelint-config": "^5.0.0"
+    },
+    "eslintConfig": {
+        "extends": "@ringieraxelspringer/eslint-config",
+        "parserOptions": {
+            "sourceType": "script"
+        },
+        "rules": {
+            "n/no-unsupported-features/es-builtins": "off",
+            "n/no-unsupported-features/es-syntax": "off",
+            "n/no-unsupported-features/node-builtins": "off"
+        }
+    },
+    "stylelint": {
+        "extends": "@ringieraxelspringer/stylelint-config"
+    }
+}
+

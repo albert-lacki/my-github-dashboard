@@ -5,21 +5,35 @@ let currentMode = 'review_requested';
 let viewerLogin = null;
 
 // ── Draft visibility ───────────────────────────────────
-function draftKey(mode) { return `pr_show_drafts_${mode}`; }
+function draftKey(mode) {
+    return `pr_show_drafts_${mode}`;
+}
+
 function showDrafts(mode) {
     const stored = localStorage.getItem(draftKey(mode));
-    if (stored !== null) return stored === 'true';
+
+    if (stored !== null) {
+        return stored === 'true';
+    }
+
     return mode === 'my_prs'; // default: ON for my_prs, OFF elsewhere
 }
+
+// eslint-disable-next-line no-unused-vars
 function setShowDrafts(mode, val) {
     localStorage.setItem(draftKey(mode), val);
     renderPRs();
     updateStats();
     updateDraftToggle();
 }
+
 function updateDraftToggle() {
     const btn = document.getElementById('btnDraftToggle');
-    if (!btn) return;
+
+    if (!btn) {
+        return;
+    }
+
     const on = showDrafts(currentMode);
     btn.textContent = on ? 'drafts: on' : 'drafts: off';
     btn.classList.toggle('active', on);
@@ -30,16 +44,27 @@ let lastSeenCount = null; // PR count when tab was last active
 let hasUnread = false;
 
 function setFavicon(alert) {
-    const link = document.querySelector("link[rel='icon']");
-    if (link) link.href = alert ? 'favicon-alert.svg' : 'favicon.svg';
+    const link = document.querySelector('link[rel=\'icon\']');
+
+    if (link) {
+        link.href = alert ? 'favicon-alert.svg' : 'favicon.svg';
+    }
 }
 
 function setUnread(count, myPRActivity) {
     hasUnread = count > 0 || myPRActivity;
+
     if (hasUnread) {
         const parts = [];
-        if (count > 0)     parts.push(`${count} new`);
-        if (myPRActivity)  parts.push('activity');
+
+        if (count > 0) {
+            parts.push(`${count} new`);
+        }
+
+        if (myPRActivity) {
+            parts.push('activity');
+        }
+
         document.title = `(${parts.join(', ')}) PR Inbox`;
         setFavicon(true);
     } else {
@@ -59,33 +84,46 @@ document.addEventListener('visibilitychange', () => {
 
 // ── Auto-refresh ───────────────────────────────────────
 let autoRefreshTimer = null;
-const AUTO_REFRESH_KEY      = 'pr_auto_refresh';
+const AUTO_REFRESH_KEY = 'pr_auto_refresh';
 const AUTO_REFRESH_FREQ_KEY = 'pr_auto_refresh_freq';
 
-function autoRefreshEnabled() { return localStorage.getItem(AUTO_REFRESH_KEY) !== 'false'; }
-function autoRefreshFreq()    { return parseInt(localStorage.getItem(AUTO_REFRESH_FREQ_KEY) || '15', 10); }
+function autoRefreshEnabled() {
+    return localStorage.getItem(AUTO_REFRESH_KEY) !== 'false';
+}
+
+function autoRefreshFreq() {
+    return parseInt(localStorage.getItem(AUTO_REFRESH_FREQ_KEY) || '15', 10);
+}
 
 function scheduleAutoRefresh() {
     clearInterval(autoRefreshTimer);
-    if (!autoRefreshEnabled()) return;
+
+    if (!autoRefreshEnabled()) {
+        return;
+    }
+
     autoRefreshTimer = setInterval(() => loadPRs(), autoRefreshFreq() * 60 * 1000);
 }
 
+// eslint-disable-next-line no-unused-vars
 function setAutoRefresh(enabled) {
     localStorage.setItem(AUTO_REFRESH_KEY, enabled);
     document.getElementById('autoRefreshToggle').checked = enabled;
     scheduleAutoRefresh();
 }
 
+// eslint-disable-next-line no-unused-vars
 function setAutoRefreshFreq(minutes) {
     localStorage.setItem(AUTO_REFRESH_FREQ_KEY, minutes);
     scheduleAutoRefresh();
 }
 
 // ── Mode switcher ──────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 function toggleModeMenu() {
     document.getElementById('modeMenu').classList.toggle('open');
 }
+
 document.addEventListener('click', e => {
     if (!e.target.closest('.main-header-wrap')) {
         document.getElementById('modeMenu')?.classList.remove('open');
@@ -94,21 +132,22 @@ document.addEventListener('click', e => {
 
 const MODE_LABELS = {
     review_requested: 'review_requested',
-    reviewed:         'reviewed',
-    my_prs:           'my_prs',
-    other:            'other',
+    reviewed: 'reviewed',
+    my_prs: 'my_prs',
+    other: 'other'
 };
 const MODE_QUERIES = {
     review_requested: 'is:pr is:open review-requested:@me',
-    reviewed:         'is:pr is:open reviewed-by:@me',
-    my_prs:           'is:pr is:open author:@me',
-    other:            'is:pr is:open review-requested:@me',
+    reviewed: 'is:pr is:open reviewed-by:@me',
+    my_prs: 'is:pr is:open author:@me',
+    other: 'is:pr is:open review-requested:@me'
 };
 
+// eslint-disable-next-line no-unused-vars
 function setMode(mode, el) {
     currentMode = mode;
     location.hash = mode;
-    document.getElementById('modeTitle').childNodes[0].textContent = MODE_LABELS[mode] + ' ';
+    document.getElementById('modeTitle').childNodes[0].textContent = `${MODE_LABELS[mode] } `;
     document.querySelectorAll('.mode-item').forEach(i => i.classList.remove('active'));
     el.classList.add('active');
     document.getElementById('modeMenu').classList.remove('open');
@@ -118,20 +157,25 @@ function setMode(mode, el) {
 
 function restoreModeFromHash() {
     const hash = location.hash.replace('#', '');
-    if (!MODE_LABELS[hash]) return;
+
+    if (!MODE_LABELS[hash]) {
+        return;
+    }
+
     currentMode = hash;
-    document.getElementById('modeTitle').childNodes[0].textContent = MODE_LABELS[hash] + ' ';
+    document.getElementById('modeTitle').childNodes[0].textContent = `${MODE_LABELS[hash] } `;
     document.querySelectorAll('.mode-item').forEach(el => {
         el.classList.toggle('active', el.textContent.trim() === MODE_LABELS[hash]);
     });
 }
 
 // ── Config export / import ─────────────────────────────
+// eslint-disable-next-line no-unused-vars
 function exportConfig() {
     const config = JSON.stringify({
         token: loadToken(),
         prefixes: loadPrefixes(),
-        includeAssigned: loadIncludeAssigned(),
+        includeAssigned: loadIncludeAssigned()
     }, null, 2);
     navigator.clipboard.writeText(config)
         .then(() => showToast('Config copied to clipboard.'))
@@ -144,42 +188,78 @@ function importConfig() {
     try {
         const raw = document.getElementById('configImport').value.trim();
         const config = JSON.parse(raw);
-        if (config.token)    { saveToken(config.token); document.getElementById('tokenInput').value = config.token; }
-        if (Array.isArray(config.prefixes)) { savePrefixes(config.prefixes); renderPrefixes(); }
+
+        if (config.token) {
+            saveToken(config.token);
+            document.getElementById('tokenInput').value = config.token;
+        }
+
+        if (Array.isArray(config.prefixes)) {
+            savePrefixes(config.prefixes);
+            renderPrefixes();
+        }
+
         if (config.includeAssigned !== undefined) {
             localStorage.setItem('pr_include_assigned', config.includeAssigned);
             document.getElementById('includeAssignedToggle').checked = config.includeAssigned;
         }
+
         document.getElementById('configImport').value = '';
         showToast('Config imported.');
-        if (loadToken()) loadPRs();
-    } catch { showToast('Invalid JSON — check your config.'); }
+
+        if (loadToken()) {
+            loadPRs();
+        }
+    } catch {
+        showToast('Invalid JSON — check your config.');
+    }
 }
 
+// eslint-disable-next-line no-unused-vars
 function scheduleImport() {
     // auto-import 100ms after paste so the textarea value is populated
     setTimeout(importConfig, 100);
 }
 
 // ── Drawer ─────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 function openDrawer() {
     document.getElementById('drawer').classList.add('open');
     document.getElementById('drawerOverlay').classList.add('open');
 }
+
+// eslint-disable-next-line no-unused-vars
 function closeDrawer() {
     document.getElementById('drawer').classList.remove('open');
     document.getElementById('drawerOverlay').classList.remove('open');
 }
 
 // ── Persistence ────────────────────────────────────────
-function saveToken(val) { localStorage.setItem('pr_token', val); }
-function loadToken()    { return localStorage.getItem('pr_token') || ''; }
-function savePrefixes(arr) { localStorage.setItem('pr_prefixes', JSON.stringify(arr)); }
-function loadPrefixes() {
-    try { return JSON.parse(localStorage.getItem('pr_prefixes')) || []; }
-    catch { return []; }
+function saveToken(val) {
+    localStorage.setItem('pr_token', val);
 }
-function loadIncludeAssigned() { return localStorage.getItem('pr_include_assigned') !== 'false'; }
+
+function loadToken() {
+    return localStorage.getItem('pr_token') || '';
+}
+
+function savePrefixes(arr) {
+    localStorage.setItem('pr_prefixes', JSON.stringify(arr));
+}
+
+function loadPrefixes() {
+    try {
+        return JSON.parse(localStorage.getItem('pr_prefixes')) || [];
+    } catch {
+        return [];
+    }
+}
+
+function loadIncludeAssigned() {
+    return localStorage.getItem('pr_include_assigned') !== 'false';
+}
+
+// eslint-disable-next-line no-unused-vars
 function saveIncludeAssigned(val) {
     localStorage.setItem('pr_include_assigned', val);
     renderPRs();
@@ -187,6 +267,7 @@ function saveIncludeAssigned(val) {
 }
 
 // ── Token UI ───────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 function toggleToken() {
     const inp = document.getElementById('tokenInput');
     inp.type = inp.type === 'password' ? 'text' : 'password';
@@ -200,24 +281,41 @@ function renderPrefixes() {
     ).join('');
 }
 
+// eslint-disable-next-line no-unused-vars
 function addPrefix() {
     const input = document.getElementById('prefixInput');
     const val = input.value.trim();
-    if (!val) return;
+
+    if (!val) {
+        return;
+    }
+
     const prefixes = loadPrefixes();
-    if (!prefixes.includes(val)) { prefixes.push(val); savePrefixes(prefixes); renderPrefixes(); }
+
+    if (!prefixes.includes(val)) {
+        prefixes.push(val);
+        savePrefixes(prefixes);
+        renderPrefixes();
+    }
+
     input.value = '';
 }
 
+// eslint-disable-next-line no-unused-vars
 function removePrefix(i) {
     const prefixes = loadPrefixes();
     prefixes.splice(i, 1);
     savePrefixes(prefixes);
     renderPrefixes();
-    if (allPRs.length) { renderPRs(); updateStats(); }
+
+    if (allPRs.length) {
+        renderPRs();
+        updateStats();
+    }
 }
 
 // ── Filters ────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 function setFilter(f, btn) {
     currentFilter = f;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -228,66 +326,131 @@ function setFilter(f, btn) {
 function filteredPRs() {
     const prefixes = loadPrefixes();
     let prs = allPRs;
+
     if (currentMode === 'other') {
-        if (prefixes.length) prs = prs.filter(pr => !prefixes.some(p => pr.repoName.startsWith(p)));
-    } else {
         if (prefixes.length) {
-            const includeAssigned = loadIncludeAssigned();
-            prs = prs.filter(pr =>
-                prefixes.some(p => pr.repoName.startsWith(p)) ||
-                (includeAssigned && pr.isAssigned)
-            );
+            prs = prs.filter(pr => !prefixes.some(p => pr.repoName.startsWith(p)));
         }
+    } else if (prefixes.length) {
+        const includeAssigned = loadIncludeAssigned();
+        prs = prs.filter(pr =>
+            prefixes.some(p => pr.repoName.startsWith(p))
+                || (includeAssigned && pr.isAssigned)
+        );
     }
+
     // review_requested is for PRs the viewer needs to review — exclude their own PRs
     // (own PRs belong in my_prs; viewer doesn't review their own work)
     if (currentMode === 'review_requested') {
         prs = prs.filter(pr => pr.author !== viewerLogin);
     }
-    if (!showDrafts(currentMode)) prs = prs.filter(pr => !pr.isDraft);
-    if (currentFilter === 'new')           prs = prs.filter(pr => pr.ageHours < 24);
-    if (currentFilter === 'new_comments')  prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0 || newThreadCount(pr.number, pr.threadCount) > 0);
-    if (currentFilter === 'stale')         prs = prs.filter(pr => pr.updatedAgo >= 120);
+
+    if (!showDrafts(currentMode)) {
+        prs = prs.filter(pr => !pr.isDraft);
+    }
+
+    if (currentFilter === 'new') {
+        prs = prs.filter(pr => pr.ageHours < 24);
+    }
+
+    if (currentFilter === 'new_comments') {
+        prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0 || newThreadCount(pr.number, pr.threadCount) > 0);
+    }
+
+    if (currentFilter === 'stale') {
+        prs = prs.filter(pr => pr.updatedAgo >= 120);
+    }
+
     return prs;
 }
 
 // ── Age helpers ────────────────────────────────────────
-function ageHours(dateStr) { return (Date.now() - new Date(dateStr).getTime()) / 36e5; }
+function ageHours(dateStr) {
+    return (Date.now() - new Date(dateStr).getTime()) / 36e5;
+}
+
 function ageLabel(h) {
-    if (h < 1)  return '<1h';
-    if (h < 24) return `${Math.floor(h)}h`;
+    if (h < 1) {
+        return '<1h';
+    }
+
+    if (h < 24) {
+        return `${Math.floor(h)}h`;
+    }
+
     return `${Math.floor(h / 24)}d`;
 }
+
 function ageClass(h) {
-    if (h >= 120) return 'crit'; // ≥5d
-    if (h >= 48)  return 'warn'; // ≥2d
+    if (h >= 120) {
+        return 'crit';
+    } // ≥5d
+
+    if (h >= 48) {
+        return 'warn';
+    } // ≥2d
+
     return '';
 }
+
 function cardClass(pr) {
     if (currentMode === 'review_requested' || currentMode === 'other' || currentMode === 'my_prs') {
-        if (pr.anyChangesRequested) return 'changes-requested';
-        if (pr.approvedCount >= 2)  return 'fresh';
+        if (pr.anyChangesRequested) {
+            return 'changes-requested';
+        }
+
+        if (pr.approvedCount >= 2) {
+            return 'fresh';
+        }
+
         return '';
     }
+
     if (currentMode === 'reviewed') {
-        if (pr.iChangesRequested) return 'changes-requested';
-        if (pr.iApproved)         return 'fresh';
+        if (pr.iChangesRequested) {
+            return 'changes-requested';
+        }
+
+        if (pr.iApproved) {
+            return 'fresh';
+        }
+
         return '';
     }
+
     return '';
 }
 
 // ── CI helpers ─────────────────────────────────────────
 function ciClass(ci) {
-    if (ci === 'pass')    return 'ci-pass';
-    if (ci === 'fail')    return 'ci-fail';
-    if (ci === 'pending') return 'ci-pending';
+    if (ci === 'pass') {
+        return 'ci-pass';
+    }
+
+    if (ci === 'fail') {
+        return 'ci-fail';
+    }
+
+    if (ci === 'pending') {
+        return 'ci-pending';
+    }
+
     return 'ci-none';
 }
+
 function ciLabel(ci) {
-    if (ci === 'pass')    return '✓ pass';
-    if (ci === 'fail')    return '✗ fail';
-    if (ci === 'pending') return '⟳ running';
+    if (ci === 'pass') {
+        return '✓ pass';
+    }
+
+    if (ci === 'fail') {
+        return '✗ fail';
+    }
+
+    if (ci === 'pending') {
+        return '⟳ running';
+    }
+
     return '— no CI';
 }
 
@@ -298,13 +461,14 @@ function renderPRs() {
     document.getElementById('countBadge').textContent = prs.length;
 
     if (!prs.length) {
-        list.innerHTML = `<div class="state-box"><div class="big">✓</div>No PRs match current filters.</div>`;
+        list.innerHTML = '<div class="state-box"><div class="big">✓</div>No PRs match current filters.</div>';
+
         return;
     }
 
     list.innerHTML = prs.map((pr, i) => {
         const newComments = newCommentCount(pr.number, pr.commentCount);
-        const newThreads  = newThreadCount(pr.number, pr.threadCount);
+        const newThreads = newThreadCount(pr.number, pr.threadCount);
         const humanChip = (pr.threadCount > 0 || pr.commentCount > 0)
             ? `<span class="meta-chip">◎ ${pr.threadCount} threads${newThreads > 0 ? ` <span class="new-comments">(+${newThreads})</span>` : ''}</span>`
             : '';
@@ -314,10 +478,11 @@ function renderPRs() {
         const copilotChip = pr.copilotUnresolved > 0
             ? `<span class="meta-chip copilot-chip">⬡ ${pr.copilotUnresolved} copilot</span>`
             : '';
-        const draftBadge  = pr.isDraft ? `<span class="label-chip draft-badge">draft</span>` : '';
-        const labelChips  = pr.labels.map(l =>
+        const draftBadge = pr.isDraft ? '<span class="label-chip draft-badge">draft</span>' : '';
+        const labelChips = pr.labels.map(l =>
             `<span class="label-chip" style="border-color:#${l.color}22;color:#${l.color}">${l.name}</span>`
         ).join('');
+
         return `
             <a class="pr-card ${cardClass(pr)}" href="${pr.url}" target="_blank"
                style="animation-delay:${i * 30}ms"
@@ -351,38 +516,54 @@ function renderPRs() {
 function updateStats() {
     const prefixes = loadPrefixes();
     let prs = allPRs;
-    if (prefixes.length) prs = prs.filter(pr => prefixes.some(p => pr.repoName.startsWith(p)));
+
+    if (prefixes.length) {
+        prs = prs.filter(pr => prefixes.some(p => pr.repoName.startsWith(p)));
+    }
+
     document.getElementById('statTotal').textContent = prs.length;
     document.getElementById('statStale').textContent = prs.filter(p => p.updatedAgo >= 120).length;
-    document.getElementById('statNew').textContent   = prs.filter(p => p.ageHours < 24).length;
+    document.getElementById('statNew').textContent = prs.filter(p => p.ageHours < 24).length;
 }
 
 function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── API ────────────────────────────────────────────────
 async function ghFetch(url, token) {
     const res = await fetch(url, {
         headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/vnd.github+json',
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28'
         }
     });
-    if (!res.ok) throw new Error(`GitHub API ${res.status}: ${res.statusText}`);
+
+    if (!res.ok) {
+        throw new Error(`GitHub API ${res.status}: ${res.statusText}`);
+    }
+
     return res.json();
 }
 
 async function ghGraphQL(query, variables, token) {
     const res = await fetch('https://api.github.com/graphql', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, variables }),
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables })
     });
-    if (!res.ok) throw new Error(`GitHub GraphQL ${res.status}: ${res.statusText}`);
+
+    if (!res.ok) {
+        throw new Error(`GitHub GraphQL ${res.status}: ${res.statusText}`);
+    }
+
     const json = await res.json();
-    if (json.errors?.length) throw new Error(json.errors[0].message);
+
+    if (json.errors?.length) {
+        throw new Error(json.errors[0].message);
+    }
+
     return json.data;
 }
 
@@ -391,132 +572,198 @@ async function ghGraphQL(query, variables, token) {
 const SEEN_KEY = 'pr_seen';
 
 function seenLoad() {
-    try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); }
-    catch { return {}; }
+    try {
+        return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}');
+    } catch {
+        return {};
+    }
 }
 
+// eslint-disable-next-line no-unused-vars
 function markSeen(pr) {
     const seen = seenLoad();
     seen[pr.number] = {
         commentCount: pr.commentCount,
-        threadCount:  pr.threadCount,
-        seenAt:       Date.now(),
+        threadCount: pr.threadCount,
+        seenAt: Date.now()
     };
-    try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); }
-    catch { /* storage full */ }
+
+    try {
+        localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    } catch { /* storage full */ }
 }
 
 function markSeenFull(pr) {
     const seen = seenLoad();
     seen[pr.number] = {
-        commentCount:        pr.commentCount,
-        threadCount:         pr.threadCount,
-        totalComments:       pr.totalComments,
-        approvedCount:       pr.approvedCount,
+        commentCount: pr.commentCount,
+        threadCount: pr.threadCount,
+        totalComments: pr.totalComments,
+        approvedCount: pr.approvedCount,
         anyChangesRequested: pr.anyChangesRequested,
-        seenAt:              Date.now(),
+        seenAt: Date.now()
     };
-    try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); }
-    catch { /* storage full */ }
+
+    try {
+        localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    } catch { /* storage full */ }
 }
 
 function newCommentCount(prNumber, currentCount) {
     const entry = seenLoad()[prNumber];
-    if (!entry) return 0;
+
+    if (!entry) {
+        return 0;
+    }
+
     return Math.max(0, currentCount - entry.commentCount);
 }
 
 function newThreadCount(prNumber, currentCount) {
     const entry = seenLoad()[prNumber];
-    if (!entry) return 0;
+
+    if (!entry) {
+        return 0;
+    }
+
     return Math.max(0, currentCount - (entry.threadCount ?? 0));
 }
 
 function hasNewActivity(pr) {
     const entry = seenLoad()[pr.number];
-    if (!entry) return false;
-    return pr.totalComments   > (entry.totalComments   ?? 0) ||
-           pr.approvedCount   > (entry.approvedCount   ?? 0) ||
-           (pr.anyChangesRequested && !entry.anyChangesRequested);
+
+    if (!entry) {
+        return false;
+    }
+
+    return pr.totalComments > (entry.totalComments ?? 0)
+           || pr.approvedCount > (entry.approvedCount ?? 0)
+           || (pr.anyChangesRequested && !entry.anyChangesRequested);
 }
 
 // ── CI cache ───────────────────────────────────────────
 // Keyed by SHA. Each entry: { status, expiresAt, accessedAt }
 // TTL: pass=7d, fail=1h, none=7d. pending is never cached.
 // Eviction: when over MAX_ENTRIES, drop LRU (oldest accessedAt) first.
-const CI_CACHE_KEY  = 'pr_ci_cache';
-const CI_CACHE_MAX  = 500;
+const CI_CACHE_KEY = 'pr_ci_cache';
+const CI_CACHE_MAX = 500;
 const CI_TTL = {
     pass: 7 * 24 * 60 * 60 * 1000,
-    fail:      60 * 60 * 1000,
-    none: 7 * 24 * 60 * 60 * 1000,
+    fail: 60 * 60 * 1000,
+    none: 7 * 24 * 60 * 60 * 1000
 };
 
 function ciCacheLoad() {
-    try { return JSON.parse(localStorage.getItem(CI_CACHE_KEY) || '{}'); }
-    catch { return {}; }
+    try {
+        return JSON.parse(localStorage.getItem(CI_CACHE_KEY) || '{}');
+    } catch {
+        return {};
+    }
 }
+
 function ciCacheSave(cache) {
-    try { localStorage.setItem(CI_CACHE_KEY, JSON.stringify(cache)); }
-    catch { /* storage full */ }
+    try {
+        localStorage.setItem(CI_CACHE_KEY, JSON.stringify(cache));
+    } catch { /* storage full */ }
 }
 
 function ciCacheGet(sha) {
     const cache = ciCacheLoad();
     const entry = cache[sha];
-    if (!entry) return null;
+
+    if (!entry) {
+        return null;
+    }
+
     // migrate: old format stored string directly instead of {status, expiresAt, accessedAt}
     if (typeof entry === 'string') {
         delete cache[sha];
         ciCacheSave(cache);
+
         return null;
     }
+
     if (Date.now() > entry.expiresAt) {
         delete cache[sha];
         ciCacheSave(cache);
+
         return null;
     }
+
     // bump accessedAt for LRU
     entry.accessedAt = Date.now();
     ciCacheSave(cache);
+
     return entry.status;
 }
 
 function ciCacheSet(sha, status) {
-    if (status === 'pending') return;
+    if (status === 'pending') {
+        return;
+    }
+
     const ttl = CI_TTL[status];
-    if (!ttl) return;
+
+    if (!ttl) {
+        return;
+    }
+
     const cache = ciCacheLoad();
     cache[sha] = { status, expiresAt: Date.now() + ttl, accessedAt: Date.now() };
     // LRU eviction if over limit
     const keys = Object.keys(cache);
+
     if (keys.length > CI_CACHE_MAX) {
         keys.sort((a, b) => cache[a].accessedAt - cache[b].accessedAt)
             .slice(0, keys.length - CI_CACHE_MAX)
             .forEach(k => delete cache[k]);
     }
+
     ciCacheSave(cache);
 }
 
 async function getCIStatus(owner, repo, sha, token) {
     const cached = ciCacheGet(sha);
-    if (cached !== null) return cached;
+
+    if (cached !== null) {
+        return cached;
+    }
 
     try {
         const data = await ghFetch(
             `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`, token
         );
         const runs = data.check_runs || [];
-        if (!runs.length) { ciCacheSet(sha, 'none'); return 'none'; }
-        const FAIL_CONCLUSIONS    = new Set(['failure', 'timed_out', 'action_required', 'stale']);
-        const NEUTRAL_CONCLUSIONS = new Set(['skipped', 'neutral', 'cancelled']);
-        if (runs.some(r => FAIL_CONCLUSIONS.has(r.conclusion))) { ciCacheSet(sha, 'fail'); return 'fail'; }
-        if (runs.some(r => r.status !== 'completed')) return 'pending'; // not cached
-        if (runs.every(r => r.conclusion === 'success' || NEUTRAL_CONCLUSIONS.has(r.conclusion))) {
-            ciCacheSet(sha, 'pass'); return 'pass';
+
+        if (!runs.length) {
+            ciCacheSet(sha, 'none');
+
+            return 'none';
         }
+
+        const FAIL_CONCLUSIONS = new Set(['failure', 'timed_out', 'action_required', 'stale']);
+        const NEUTRAL_CONCLUSIONS = new Set(['skipped', 'neutral', 'cancelled']);
+
+        if (runs.some(r => FAIL_CONCLUSIONS.has(r.conclusion))) {
+            ciCacheSet(sha, 'fail');
+
+            return 'fail';
+        }
+
+        if (runs.some(r => r.status !== 'completed')) {
+            return 'pending';
+        } // not cached
+
+        if (runs.every(r => r.conclusion === 'success' || NEUTRAL_CONCLUSIONS.has(r.conclusion))) {
+            ciCacheSet(sha, 'pass');
+
+            return 'pass';
+        }
+
         return 'pending';
-    } catch { return 'none'; }
+    } catch {
+        return 'none';
+    }
 }
 
 const GQL_SEARCH = `
@@ -550,7 +797,12 @@ const GQL_SEARCH = `
 
 async function loadPRs() {
     const token = loadToken();
-    if (!token) { showToast('Enter a GitHub token first.'); return; }
+
+    if (!token) {
+        showToast('Enter a GitHub token first.');
+
+        return;
+    }
 
     const btn = document.getElementById('btnRefresh');
     const dot = document.getElementById('statusDot');
@@ -560,16 +812,17 @@ async function loadPRs() {
     btn.disabled = true;
     dot.className = 'dot';
     statusText.textContent = 'fetching…';
-    list.innerHTML = `<div class="state-box"><span class="spinner"></span>Loading PRs…</div>`;
+    list.innerHTML = '<div class="state-box"><span class="spinner"></span>Loading PRs…</div>';
     document.getElementById('countBadge').textContent = '…';
     document.getElementById('statTotal').textContent = '—';
     document.getElementById('statStale').textContent = '—';
-    document.getElementById('statNew').textContent   = '—';
+    document.getElementById('statNew').textContent = '—';
 
     try {
         // fetch viewer login once — needed for review state attribution
         if (!viewerLogin) {
             const vd = await ghGraphQL('{ viewer { login } }', {}, token);
+            // eslint-disable-next-line require-atomic-updates
             viewerLogin = vd.viewer.login;
         }
 
@@ -579,9 +832,11 @@ async function loadPRs() {
         // (GitHub removes reviewer from reviewRequests after review, so they disappear from review-requested:@me)
         const needsChangesRequestedMerge = currentMode === 'review_requested' || currentMode === 'other';
         const queries = [MODE_QUERIES[currentMode]];
+
         if (needsChangesRequestedMerge) {
             queries.push(`is:pr is:open reviewed-by:${viewerLogin}`);
         }
+
         // For my_prs: also fetch PRs where viewer is assignee but not author
         // (these are PRs the viewer is responsible for but didn't open themselves)
         if (currentMode === 'my_prs' && loadIncludeAssigned()) {
@@ -590,11 +845,16 @@ async function loadPRs() {
 
         for (const q of queries) {
             let after = null;
+
             for (let page = 0; page < 4; page++) {
                 const data = await ghGraphQL(GQL_SEARCH, { query: q, after }, token);
                 const { nodes: pageNodes, pageInfo } = data.search;
                 nodes = nodes.concat(pageNodes.filter(n => n.number && n.state === 'OPEN'));
-                if (!pageInfo.hasNextPage) break;
+
+                if (!pageInfo.hasNextPage) {
+                    break;
+                }
+
                 after = pageInfo.endCursor;
             }
         }
@@ -606,58 +866,62 @@ async function loadPRs() {
         nodes = [...byNumber.values()];
 
         const enriched = await Promise.all(nodes.map(async node => {
-            const owner    = node.repository.owner.login;
-            const repo     = node.repository.name;
-            const ci       = await getCIStatus(owner, repo, node.headRefOid, token);
+            const owner = node.repository.owner.login;
+            const repo = node.repository.name;
+            const ci = await getCIStatus(owner, repo, node.headRefOid, token);
             const threads = node.reviewThreads?.nodes ?? [];
             const isCopilot = login => login && (
-                login === 'copilot-pull-request-reviewer' ||
-                login === 'copilot-pull-request-reviewer[bot]' ||
-                login.startsWith('copilot')
+                login === 'copilot-pull-request-reviewer'
+                || login === 'copilot-pull-request-reviewer[bot]'
+                || login.startsWith('copilot')
             );
-            const humanThreads   = threads.filter(t => !isCopilot(t.comments.nodes[0]?.author?.login));
-            const copilotThreads = threads.filter(t =>  isCopilot(t.comments.nodes[0]?.author?.login));
+            const humanThreads = threads.filter(t => !isCopilot(t.comments.nodes[0]?.author?.login));
+            const copilotThreads = threads.filter(t => isCopilot(t.comments.nodes[0]?.author?.login));
 
-            const humanUnresolvedThreads  = humanThreads.filter(t => !t.isResolved).length;
-            const unresolvedComments      = threads.filter(t => !t.isResolved)
-                                                .reduce((s, t) => s + t.comments.totalCount, 0);
-            const humanTotalComments      = threads.reduce((s, t) => s + t.comments.totalCount, 0);
-            const copilotUnresolved       = copilotThreads.filter(t => !t.isResolved).length;
-            const reviews  = node.reviews?.nodes ?? [];
+            const humanUnresolvedThreads = humanThreads.filter(t => !t.isResolved).length;
+            const unresolvedComments = threads.filter(t => !t.isResolved)
+                .reduce((s, t) => s + t.comments.totalCount, 0);
+            const humanTotalComments = threads.reduce((s, t) => s + t.comments.totalCount, 0);
+            const copilotUnresolved = copilotThreads.filter(t => !t.isResolved).length;
+            const reviews = node.reviews?.nodes ?? [];
             // latest review state per author (last review wins)
             const latestByAuthor = {};
-            reviews.forEach(r => { latestByAuthor[r.author?.login] = r.state; });
-            const iChangesRequested   = latestByAuthor[viewerLogin] === 'CHANGES_REQUESTED';
-            const iApproved           = latestByAuthor[viewerLogin] === 'APPROVED';
-            const approvedCount       = Object.values(latestByAuthor).filter(s => s === 'APPROVED').length;
+            reviews.forEach(r => {
+                latestByAuthor[r.author?.login] = r.state;
+            });
+            const iChangesRequested = latestByAuthor[viewerLogin] === 'CHANGES_REQUESTED';
+            const iApproved = latestByAuthor[viewerLogin] === 'APPROVED';
+            const approvedCount = Object.values(latestByAuthor).filter(s => s === 'APPROVED').length;
             const anyChangesRequested = Object.values(latestByAuthor).some(s => s === 'CHANGES_REQUESTED');
+
             return {
-                number:             node.number,
-                title:              node.title,
-                url:                node.url,
-                repoName:           repo,
-                author:             node.author?.login ?? 'unknown',
-                authorAvatar:       (node.author?.avatarUrl ?? '') + '&s=32',
-                ageHours:           ageHours(node.createdAt),
-                updatedAgo:         ageHours(node.updatedAt),
-                commentCount:       unresolvedComments,
-                threadCount:        humanUnresolvedThreads,
-                totalComments:      humanTotalComments,
+                number: node.number,
+                title: node.title,
+                url: node.url,
+                repoName: repo,
+                author: node.author?.login ?? 'unknown',
+                authorAvatar: `${node.author?.avatarUrl ?? '' }&s=32`,
+                ageHours: ageHours(node.createdAt),
+                updatedAgo: ageHours(node.updatedAt),
+                commentCount: unresolvedComments,
+                threadCount: humanUnresolvedThreads,
+                totalComments: humanTotalComments,
                 copilotUnresolved,
                 ci,
                 iChangesRequested,
                 iApproved,
                 approvedCount,
                 anyChangesRequested,
-                isDraft:            node.isDraft,
-                labels:             node.labels?.nodes ?? [],
-                isAssigned:         (node.assignees?.nodes ?? []).some(a => a.login === viewerLogin),
+                isDraft: node.isDraft,
+                labels: node.labels?.nodes ?? [],
+                isAssigned: (node.assignees?.nodes ?? []).some(a => a.login === viewerLogin)
             };
         }));
 
         // For review_requested / other: drop PRs where we already approved (but keep ones
         // where we gave CHANGES_REQUESTED — GitHub removes those from review-requested:@me after review).
         let finalEnriched = enriched;
+
         if (needsChangesRequestedMerge) {
             finalEnriched = enriched.filter(pr => !pr.iApproved || pr.iChangesRequested);
         }
@@ -678,6 +942,7 @@ async function loadPRs() {
             const newMyPRActivity = allPRs
                 .filter(pr => pr.author === viewerLogin)
                 .some(pr => hasNewActivity(pr));
+
             if (newPRs || newMyPRActivity) {
                 const n = newPRs ? currentCount - lastSeenCount : 0;
                 setUnread(n, newMyPRActivity);
@@ -688,7 +953,6 @@ async function loadPRs() {
             allPRs.filter(pr => pr.author === viewerLogin).forEach(markSeenFull);
             setUnread(0, false);
         }
-
     } catch (err) {
         dot.className = 'dot error';
         statusText.textContent = 'error';
@@ -700,6 +964,7 @@ async function loadPRs() {
 }
 
 // ── Cache management ───────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 function clearAllCache() {
     localStorage.removeItem(CI_CACHE_KEY);
     localStorage.removeItem(SEEN_KEY);
@@ -721,8 +986,13 @@ function showToast(msg) {
     try {
         const cache = JSON.parse(localStorage.getItem(CI_CACHE_KEY) || '{}');
         const hasOldFormat = Object.values(cache).some(v => typeof v === 'string');
-        if (hasOldFormat) localStorage.removeItem(CI_CACHE_KEY);
-    } catch { localStorage.removeItem(CI_CACHE_KEY); }
+
+        if (hasOldFormat) {
+            localStorage.removeItem(CI_CACHE_KEY);
+        }
+    } catch {
+        localStorage.removeItem(CI_CACHE_KEY);
+    }
 
     document.getElementById('tokenInput').value = loadToken();
     document.getElementById('autoRefreshToggle').checked = autoRefreshEnabled();
@@ -733,6 +1003,8 @@ function showToast(msg) {
     updateDraftToggle();
     scheduleAutoRefresh();
     setFavicon(false); // init with green
-    if (loadToken()) loadPRs();
-})();
 
+    if (loadToken()) {
+        loadPRs();
+    }
+})();
