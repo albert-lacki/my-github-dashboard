@@ -86,7 +86,7 @@ favicon-alert.svg
 - **Hash router**: `location.hash` reflects current mode; survives page refresh
 - **Sort**: always by last activity (`updatedAt`) DESC — most recently active first
 - **Draft visibility toggle**: per-mode, persisted; default OFF except `my_prs`
-- **Include assigned PRs toggle**: when ON, PRs where viewer is assignee are shown regardless of prefix filter; persisted in localStorage; default ON
+- **Include assigned PRs toggle**: when ON, PRs where viewer is assignee are shown in `my_prs` regardless of prefix filter (fetched via `assignee:@me` query); they also bypass the prefix filter in other modes; persisted in localStorage; default ON
 - **Background refresh notifications**: yellow favicon (`favicon-alert.svg`) + tab title update when:
   1. new PRs appear in the current view during auto-refresh while tab is inactive
   2. new activity appears on `my_prs` (new comment, new APPROVED, new CHANGES_REQUESTED)
@@ -131,10 +131,14 @@ favicon-alert.svg
 
 | Mode | GraphQL search query |
 |---|---|
-| `review_requested` | `is:pr is:open review-requested:@me` |
+| `review_requested` | `is:pr is:open review-requested:@me` (+ `reviewed-by:@me` merged; own PRs excluded) |
 | `reviewed`         | `is:pr is:open reviewed-by:@me` |
-| `my_prs`           | `is:pr is:open author:@me` |
+| `my_prs`           | `is:pr is:open author:@me` (+ `assignee:@me` merged when *include assigned* is ON) |
 | `other`            | `is:pr is:open review-requested:@me` (prefix filter inverted) |
+
+**Assignee semantics:** A PR with the viewer as assignee represents something *the viewer is responsible for managing*. Therefore:
+- If the viewer is the **author** → appears only in `my_prs`, never in `review_requested`.
+- If the viewer is an **assignee but not the author** → appears in `my_prs` (they own it) *and* in `review_requested`/`reviewed` as appropriate (they may also need to review it).
 
 ### FR-03 — CI Status
 

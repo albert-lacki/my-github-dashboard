@@ -239,6 +239,11 @@ function filteredPRs() {
             );
         }
     }
+    // review_requested is for PRs the viewer needs to review — exclude their own PRs
+    // (own PRs belong in my_prs; viewer doesn't review their own work)
+    if (currentMode === 'review_requested') {
+        prs = prs.filter(pr => pr.author !== viewerLogin);
+    }
     if (!showDrafts(currentMode)) prs = prs.filter(pr => !pr.isDraft);
     if (currentFilter === 'new')           prs = prs.filter(pr => pr.ageHours < 24);
     if (currentFilter === 'new_comments')  prs = prs.filter(pr => newCommentCount(pr.number, pr.commentCount) > 0 || newThreadCount(pr.number, pr.threadCount) > 0);
@@ -576,6 +581,11 @@ async function loadPRs() {
         const queries = [MODE_QUERIES[currentMode]];
         if (needsChangesRequestedMerge) {
             queries.push(`is:pr is:open reviewed-by:${viewerLogin}`);
+        }
+        // For my_prs: also fetch PRs where viewer is assignee but not author
+        // (these are PRs the viewer is responsible for but didn't open themselves)
+        if (currentMode === 'my_prs' && loadIncludeAssigned()) {
+            queries.push(`is:pr is:open assignee:${viewerLogin}`);
         }
 
         for (const q of queries) {
